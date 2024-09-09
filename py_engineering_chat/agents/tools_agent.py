@@ -1,83 +1,83 @@
+import os
+from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
-from langchain.tools import Tool
-from langchain_community.tools import (
-    ReadFileTool,
-    WriteFileTool,
-    ListDirectoryTool,
-)
 from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import MessagesPlaceholder
-from langchain_core.chat_history import (
-    BaseChatMessageHistory,
-    InMemoryChatMessageHistory,
-)
-from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_community.agent_toolkits import FileManagementToolkit
+from tempfile import TemporaryDirectory
+from .base_agent import BaseAgent
+from py_engineering_chat.tools.custom_tools import FakeWeatherTool
+from py_engineering_chat.tools.shell_command_tool import SafeShellCommandTool
 
-store = {}
-def get_session_history(session_id: str) -> BaseChatMessageHistory:
-    if session_id not in store:
-        store[session_id] = InMemoryChatMessageHistory()
-    return store[session_id]
+class ToolsAgent(BaseAgent):
+    def __init__(self):
+        super().__init__()
+        load_dotenv()
+        self.llm = ChatOpenAI(temperature=0, model="gpt-4-0125-preview")
+        self.is_windows = self.check_if_windows()
+        self.ai_shadow_directory = self.create_ai_shadow_directory()
+        self.tools = self.get_tools()
+        self.agent_executor = self.create_chain()
 
-def tools_agent():
-    llm = ChatOpenAI(temperature=0, model="gpt-4-0125-preview")
-    
-    # Define file management tools
-    read_file = ReadFileTool()
-    write_file = WriteFileTool()
-    list_directory = ListDirectoryTool()
-    
-    tools = [
-        Tool(
-            name="ReadFile",
-            func=read_file.run,
-            description="Read the contents of a file"
-        ),
-        Tool(
-            name="WriteFile",
-            func=write_file.run,
-            description="Write content to a file"
-        ),
-        Tool(
-            name="ListDirectory",
-            func=list_directory.run,
-            description="List files and directories in a specified path"
-        ),
-    ]
-    
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an AI assistant capable of using file management tools. Use these tools to help the user with their file-related tasks. Available tools: {tools}"),
-        ("human", "The names of the tools available to you are {tool_names}"),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("human", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad")
-    ])
-    
-    tool_names = [tool.name for tool in tools]
-    prompt = prompt.partial(tools=", ".join(tool_names))
-    
-    agent = create_react_agent(llm, tools, prompt)
-    
-    return AgentExecutor(agent=agent, tools=tools, memory=memory, verbose=False)
+    def check_if_windows(self):
+        return os.getenv('IS_WINDOWS', 'false').lower() == 'true'
+
+    def create_ai_shadow_directory(self):
+        ai_shadow_dir = os.getenv('AI_SHADOW_DIRECTORY', './ai_shadow')
+        if self.is_windows:
+            ai_shadow_dir = ai_shadow_dir.replace('/', '\\')
+        os.makedirs(ai_shadow_dir, exist_ok=True)
+        return ai_shadow_dir
+
+    def get_file_tools(self):
+        toolkit = FileManagementToolkit(root_dir=self.ai_shadow_directory)
+        return toolkit.get_tools()
+
+    def get_tools(self):
+        #file_tools = self.get_file_tools()
+        custom_tools = [SafeShellCommandTool()]
+        return  custom_tools
+
+    def create_chain(self):
+        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"You are an AI assistant with file management capabilities. Help the user with their tasks. The current system is {'Windows' if self.is_windows else 'not Windows'}. Always use the following format:\n\nThought: your thoughts here\nAction: the action to take, should be one of {{tool_names}}\nAction Input: the input to the action\nObservation: the result of the action\n... (this Thought/Action/Action Input/Observation can repeat N times)\nThought: I now know the final answer\nFinal Answer: the final answer to the original input question"),
+            ("human", "tool names: {tool_names}\n\nAction Input: {tools}"),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+            ("human", "Thought: {agent_scratchpad}"),
+        ])
+
+        agent = create_react_agent(self.llm, self.tools, prompt)
+        
+        return AgentExecutor(agent=agent, tools=self.tools, memory=memory, verbose=True)
+
+    def chat(self):
+        print(f"Welcome to the {self.__class__.__name__} Chat!")
+        print("Type 'exit' to end the conversation.")
+
+        session_id = f"{self.__class__.__name__.lower()}_session"
+
+        while True:
+            user_input = input("You: ").strip()
+            
+            if user_input.lower() == 'exit':
+                print("Goodbye!")
+                break
+            
+            try:
+                response = self.agent_executor.invoke({"input": user_input})
+                print(f"Agent: {response['output']}")
+                
+            except Exception as e:
+                print(f"An error occurred: {str(e)}")
 
 def chat_with_tools_agent():
-    agent = tools_agent()
-    print("Welcome to the Tools Agent Chat!")
-    print("Type 'exit' to end the conversation.")
-    
-    while True:
-        user_input = input("You: ").strip()
-        
-        if user_input.lower() == 'exit':
-            print("Goodbye!")
-            break
-        
-        try:
-            response = agent.inoke(user_input)
-            print(f"Agent: {response}")
-        except Exception as e:
-            print(f"An error occurred: {str(e)}")
+    agent = ToolsAgent()
+    agent.chat()
+
+if __name__ == "__main__":
+    chat_with_tools_agent()

@@ -1,2 +1,5 @@
 volumes/
 *.pyc
+.chat_settings
+.shadow_directory
+.chroma_db
