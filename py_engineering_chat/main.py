@@ -11,6 +11,7 @@ from py_engineering_chat.research.research import crawl_and_store
 from py_engineering_chat.research.list_collections import list_collections, list_collection_content
 from py_engineering_chat.util.add_codebase import add_codebase
 from py_engineering_chat.research.scan_codebase import scan_codebase
+from py_engineering_chat.agents.tools_openai import run_continuous_conversation  # Import the new function
 
 # Suppress the specific warning
 warnings.filterwarnings("ignore", message=".*`clean_up_tokenization_spaces` was not set.*")
@@ -30,7 +31,7 @@ def chat_basic():
 @cli.command()
 def chat_tools():
     """Chat with the tools agent."""
-    chat_with_tools_agent()
+    run_continuous_conversation()  # Call the new function
 
 @cli.command()
 def chat_docs():

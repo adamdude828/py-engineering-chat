@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
 from py_engineering_chat.research.scan_codebase import scan_codebase
+from langchain_core.messages import AIMessage, HumanMessage
 
 class BaseAgent(ABC):
     def __init__(self):
@@ -37,7 +38,6 @@ class BaseAgent(ABC):
         self.client = chromadb.PersistentClient(path=str(chroma_db_path))
         
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.agent_scratchpad = []
         self.settings_manager = ChatSettingsManager()
 
     def get_session_history(self, session_id: str) -> BaseChatMessageHistory:

@@ -3,6 +3,9 @@ import json
 from typing import Dict, Any
 from langchain.tools import BaseTool
 from langchain.pydantic_v1 import BaseModel, Field
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../.env'))
 
 class DirectoryStructureInput(BaseModel):
     path: str = Field(description="The path to crawl for directory structure.")
