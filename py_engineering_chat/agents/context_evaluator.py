@@ -1,11 +1,12 @@
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.chains import LLMChain
-from langchain.output_parsers import StructuredOutputParser, ResponseSchema
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableSequence
+from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 
 class ContextEvaluator:
     def __init__(self):
-        self.llm = ChatOpenAI(temperature=0, model="gpt-4o-mini", verbose=False)
+        self.llm = ChatOpenAI(temperature=0, model="gpt-4o-mini")
 
         response_schemas = [
             ResponseSchema(name="is_contextual", description="Whether the file is likely to add context", type="boolean"),
@@ -26,17 +27,17 @@ class ContextEvaluator:
             "Provide your evaluation:"
         )
         
-        self.evaluation_chain = LLMChain(
-            llm=self.llm,
-            prompt=self.evaluation_prompt.partial(format_instructions=self.output_parser.get_format_instructions()),
-            output_parser=self.output_parser,
-            verbose=False
-        )
+        self.evaluation_chain = self.evaluation_prompt | self.llm | self.output_parser
+        
         self.total_evaluations = 0
         self.contextual_count = 0
 
     def is_contextual(self, path: str, path_type: str) -> tuple[bool, str]:
-        result = self.evaluation_chain.run(path=path, path_type=path_type)
+        result = self.evaluation_chain.invoke({
+            "path": path,
+            "path_type": path_type,
+            "format_instructions": self.output_parser.get_format_instructions()
+        })
         self.total_evaluations += 1
         if result['is_contextual']:
             self.contextual_count += 1

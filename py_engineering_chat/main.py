@@ -12,6 +12,7 @@ from py_engineering_chat.research.research import crawl_and_store  # Updated imp
 from py_engineering_chat.research.list_collections import list_collections, list_collection_content  # Updated import
 from py_engineering_chat.util.add_codebase import add_codebase
 from py_engineering_chat.research.scan_codebase import scan_codebase  # Add this import
+from agents.planning_agent import chat_with_planning_agent  # Add this import
 
 # Suppress the specific warning
 warnings.filterwarnings("ignore", message=".*`clean_up_tokenization_spaces` was not set.*")
@@ -37,6 +38,11 @@ def chat_tools():
 def chat_docs():
     """Chat with the docs agent."""
     chat_with_docs_agent()
+
+@cli.command()
+def chat_planning():
+    """Chat with the planning agent."""
+    chat_with_planning_agent()
 
 @cli.command()
 @click.argument('url')

@@ -127,7 +127,6 @@ def scan_codebase(project_name, skip_summarization=False, max_files=-1):
                 try:
                     summary = summarizer.summarize(content)
                 except Exception as e:
-                    print(f"Error calling summarizer: {e}")
                     summary = content[:1000]  # Fallback to using first 1000 characters
             else:
                 summary = content[:1000]  # Use first 1000 characters as summary
