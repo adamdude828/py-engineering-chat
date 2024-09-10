@@ -3,16 +3,14 @@ import os
 import sys
 import click
 import warnings
-import json
-from pathlib import Path
 from agents.basic_agent import chat_with_basic_agent
 from agents.tools_agent import chat_with_tools_agent
-from agents.docs_agent import chat_with_docs_agent  # Updated import
-from py_engineering_chat.research.research import crawl_and_store  # Updated import statement
-from py_engineering_chat.research.list_collections import list_collections, list_collection_content  # Updated import
-from py_engineering_chat.util.add_codebase import add_codebase
-from py_engineering_chat.research.scan_codebase import scan_codebase  # Add this import
+from agents.docs_agent import chat_with_docs_agent
 from agents.planning_agent import chat_with_planning_agent  # Add this import
+from py_engineering_chat.research.research import crawl_and_store
+from py_engineering_chat.research.list_collections import list_collections, list_collection_content
+from py_engineering_chat.util.add_codebase import add_codebase
+from py_engineering_chat.research.scan_codebase import scan_codebase
 
 # Suppress the specific warning
 warnings.filterwarnings("ignore", message=".*`clean_up_tokenization_spaces` was not set.*")

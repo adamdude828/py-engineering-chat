@@ -1,6 +1,7 @@
 from langchain.tools import BaseTool
 from langchain.pydantic_v1 import BaseModel, Field
 from .shell_command_tool import SafeShellCommandTool
+from .directory_structure_tool import DirectoryStructureTool
 
 class WeatherInput(BaseModel):
     location: str = Field(description="The name of the location to get weather for. This can be a city, state, country, or any recognizable place name.")
@@ -18,4 +19,11 @@ class FakeWeatherTool(BaseTool):
         """Asynchronous version of the weather tool."""
         return self._run(location)
 
-# SafeShellCommandTool is now imported from shell_command_tool.py
+def get_tools():
+    # ... existing tools ...
+    directory_structure_tool = DirectoryStructureTool()
+    
+    return [
+        # ... existing tools ...,
+        directory_structure_tool,
+    ]

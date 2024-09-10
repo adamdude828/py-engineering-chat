@@ -80,8 +80,14 @@ def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=
     # Load environment variables
     load_dotenv(dotenv_path='../.env')
 
+    # Get AI_SHADOW_DIRECTORY from environment variables
+    ai_shadow_directory = os.getenv('AI_SHADOW_DIRECTORY')
+    if not ai_shadow_directory:
+        raise ValueError("AI_SHADOW_DIRECTORY environment variable is not set")
+
     # Initialize Chroma client
-    client = chromadb.PersistentClient(path="./.chroma_db")
+    chroma_db_path = os.path.join(ai_shadow_directory, '.chroma_db')
+    client = chromadb.PersistentClient(path=chroma_db_path)
 
     # Check if the collection exists before deleting
     collections = client.list_collections()

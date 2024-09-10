@@ -40,21 +40,14 @@ def scan_codebase(project_name, skip_summarization=False, max_files=-1):
     # Load environment variables
     load_dotenv()
     
-    # Load .chat_settings
-    with open('.chat_settings', 'r') as f:
-        settings = json.load(f)
-    
-    if project_name not in settings['projects']:
-        raise ValueError(f"Project '{project_name}' not found in .chat_settings")
-    
-    project_dir = settings['projects'][project_name]['directory']
-    
-    # Get ignored directories from .env
-    ignored_dirs = os.getenv('IGNORED_DIRECTORIES', '').split(',')
-    ignored_dirs = [dir.strip() for dir in ignored_dirs if dir.strip()]
+    # Get AI_SHADOW_DIRECTORY from environment variables
+    ai_shadow_directory = os.getenv('AI_SHADOW_DIRECTORY')
+    if not ai_shadow_directory:
+        raise ValueError("AI_SHADOW_DIRECTORY environment variable is not set")
     
     # Initialize Chroma client
-    client = chromadb.PersistentClient(path="./.chroma_db")
+    chroma_db_path = os.path.join(ai_shadow_directory, '.chroma_db')
+    client = chromadb.PersistentClient(path=chroma_db_path)
     
     # Delete existing collection if it exists
     collection_name = f"codebase_{project_name}"
