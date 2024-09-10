@@ -14,6 +14,7 @@ from pathlib import Path
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
 from py_engineering_chat.research.scan_codebase import scan_codebase
 from langchain_core.messages import AIMessage, HumanMessage
+from py_engineering_chat.util.command_parser import parse_commands
 
 class BaseAgent(ABC):
     def __init__(self):
@@ -57,29 +58,8 @@ class BaseAgent(ABC):
 
     def process_input(self, inputs):
         user_input = inputs['input']
-        context = ""
-
-        # Handle @docs query
-        docs_match = re.search(r'@docs:(\w+)', user_input)
-        if docs_match:
-            collection_name = docs_match.group(1)
-            clean_input = re.sub(r'@docs:\w+', '', user_input).strip()
-            context = self.search_context(collection_name, clean_input)
-            inputs['input'] = clean_input
-
-        # Handle @codebase query
-        codebase_match = re.search(r'@codebase:(.*)', user_input)
-        if codebase_match:
-            query = codebase_match.group(1).strip()
-            current_project = self.settings_manager.get_setting('current_project')
-            if current_project:
-                collection_name = f"codebase_{current_project}"
-                context = self.search_context(collection_name, query)
-                inputs['input'] = re.sub(r'@codebase:.*', '', user_input).strip()
-            else:
-                context = "Error: No current project set. Please set a project first."
-
-        inputs['context'] = "\n".join(context) if context else "No additional context provided."
+        context_data = parse_commands(user_input, self.settings_manager)
+        inputs['context'] = context_data['context']
         return inputs
 
     def create_prompt(self, prompt_type: str, inputs: Dict[str, Any]) -> str:

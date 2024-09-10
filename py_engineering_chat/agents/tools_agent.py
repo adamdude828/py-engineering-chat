@@ -9,6 +9,7 @@ from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
 from py_engineering_chat.tools.custom_tools import get_tools
 from py_engineering_chat.agents.base_agent import BaseAgent
 import os
+from py_engineering_chat.util.command_parser import parse_commands
 
 class State(TypedDict):
     messages: Annotated[list[HumanMessage | AIMessage], "The conversation history"]
@@ -109,10 +110,11 @@ class ToolsAgent(BaseAgent):
         }
 
     def run(self, user_input):
+        context_data = parse_commands(user_input, self.settings_manager)
         state = {"messages": [], "next": "agent"}
         try:
             while state["next"]:
-                state = self.graph.invoke(state, {"input": user_input})
+                state = self.graph.invoke(state, {"input": user_input, "context": context_data['context']})
                 user_input = None  # Clear input after first iteration
             
             if state["messages"]:
