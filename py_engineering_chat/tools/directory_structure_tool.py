@@ -14,9 +14,13 @@ class DirectoryStructureTool(BaseTool):
     name = "directory_structure"
     description = "Crawl a directory and return its structure as a JSON object"
     args_schema: type[BaseModel] = DirectoryStructureInput
-    shadow_directory: str = Field(default_factory=lambda: ChatSettingsManager().get_ai_shadow_directory())
-    is_windows: bool = Field(default_factory=lambda: os.getenv("IS_WINDOWS", "false").lower() == "true")
-    ignored_directories: list = Field(default_factory=lambda: os.getenv("IGNORED_DIRECTORIES", "").split(","))
+
+    def __init__(self):
+        settings_manager = ChatSettingsManager()
+        current_project = settings_manager.get_setting('current_project')
+        self.shadow_directory = settings_manager.get_setting(f'projects.{current_project}.shadow_directory')
+        self.is_windows = os.getenv("IS_WINDOWS", "false").lower() == "true"
+        self.ignored_directories = os.getenv("IGNORED_DIRECTORIES", "").split(",")
 
     def _normalize_path(self, path: str) -> str:
         """Normalize the path based on the operating system."""
@@ -77,7 +81,11 @@ class FileWriteTool(BaseTool):
     name = "file_write"
     description = "Write content to a file within the shadow directory"
     args_schema: type[BaseModel] = FileWriteInput
-    shadow_directory: str = Field(default_factory=lambda: ChatSettingsManager().get_ai_shadow_directory())
+
+    def __init__(self):
+        settings_manager = ChatSettingsManager()
+        current_project = settings_manager.get_setting('current_project')
+        self.shadow_directory = settings_manager.get_setting(f'projects.{current_project}.shadow_directory')
 
     def _run(self, path: str, content: str) -> str:
         """Write content to a file."""
@@ -101,7 +109,11 @@ class FileReadTool(BaseTool):
     name = "file_read"
     description = "Read content from a file within the shadow directory"
     args_schema: type[BaseModel] = FileReadInput
-    shadow_directory: str = Field(default_factory=lambda: ChatSettingsManager().get_ai_shadow_directory())
+
+    def __init__(self):
+        settings_manager = ChatSettingsManager()
+        current_project = settings_manager.get_setting('current_project')
+        self.shadow_directory = settings_manager.get_setting(f'projects.{current_project}.shadow_directory')
 
     def _run(self, path: str) -> str:
         """Read content from a file."""

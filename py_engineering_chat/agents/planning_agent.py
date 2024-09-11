@@ -5,12 +5,16 @@ from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from typing import List, Annotated
 from typing_extensions import TypedDict
+from py_engineering_chat.tools.custom_tools import get_tools  # Import tools
+from langgraph.prebuilt import ToolNode, tools_condition  # Import ToolNode and tools_condition
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
-# Define the LLM model
+# Define the LLM model and bind tools
 llm = ChatOpenAI(temperature=0)
+tools = get_tools()
+llm_with_tools = llm.bind_tools(tools)  # Combine model with tools
 
 # Define the prompt template
 template = """Your job is to get information from a user about what type of prompt template they want to create.
@@ -27,7 +31,7 @@ def get_messages_info(messages):
 
 def info_chain(state):
     messages = get_messages_info(state["messages"])
-    response = llm.invoke(messages)
+    response = llm_with_tools.invoke(messages)  # Use the combined model
     return {"messages": [response]}
 
 # Initialize the graph
@@ -35,23 +39,28 @@ memory = MemorySaver()
 workflow = StateGraph(State)
 workflow.add_node("info", info_chain)
 
+# Add the tool node
+tool_node = ToolNode(tools=tools)
+workflow.add_node("tools", tool_node)
+
 # Define state logic
 def get_state(state) -> str:
     messages = state["messages"]
     if isinstance(messages[-1], AIMessage) and messages[-1].tool_calls:
-        return "add_tool_message"
+        return "tools"  # Transition to tools node
     elif not isinstance(messages[-1], HumanMessage):
         return END
     return "info"
 
-workflow.add_conditional_edges("info", get_state)
+workflow.add_conditional_edges("info", get_state, {"tools": "tools", "__end__": "__end__"})
+workflow.add_edge("tools", "info")  # Return to info after tool usage
 workflow.add_edge(START, "info")
 
 # Compile the graph
 graph = workflow.compile(checkpointer=memory)
 
 # Function to run the graph
-def run_conversation():
+def run_conversation_planning_agent():
     state = {"messages": []}
     while True:
         user_input = input("You: ")
@@ -64,3 +73,7 @@ def run_conversation():
                     assistant_message = value["messages"][-1].content
                     print("Assistant:", assistant_message)
                     state["messages"].append(AIMessage(content=assistant_message))
+                elif isinstance(value["messages"][-1], ToolMessage):  # Handle tool messages
+                    tool_message = value["messages"][-1].content
+                    print("Tool:", tool_message)
+                    state["messages"].append(ToolMessage(content=tool_message))

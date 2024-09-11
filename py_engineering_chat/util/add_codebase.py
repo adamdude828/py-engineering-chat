@@ -25,6 +25,9 @@ def add_codebase(project_name, directory, github_origin):
         os.chdir(settings_manager.shadow_dir)
         subprocess.run(['git', 'clone', github_origin, project_name], check=True)
         print(f"Cloned repository for '{project_name}' to {project_shadow_dir}")
+
+        # Add the shadow directory location to the chat settings
+        settings_manager.set_setting(f'projects.{project_name}.shadow_directory', str(project_shadow_dir))
     except subprocess.CalledProcessError as e:
         print(f"Error cloning repository: {e}")
     finally:

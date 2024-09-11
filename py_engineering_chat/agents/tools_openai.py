@@ -3,12 +3,12 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from typing import Annotated
 from typing_extensions import TypedDict
-from py_engineering_chat.agents.tools_agent import get_tools
 from langgraph.graph.message import add_messages
 from langchain_openai import ChatOpenAI
 from py_engineering_chat.util.command_parser import parse_commands
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager 
 from langchain_core.prompts import PromptTemplate
+from py_engineering_chat.tools.custom_tools import get_tools
 
 class State(TypedDict):
     # Messages have the type "list". The `add_messages` function

@@ -3,10 +3,8 @@ import os
 import sys
 import click
 import warnings
-from agents.basic_agent import chat_with_basic_agent
-from agents.tools_agent import chat_with_tools_agent
 from agents.docs_agent import chat_with_docs_agent
-from agents.planning_agent import chat_with_planning_agent  # Add this import
+from agents.planning_agent import run_conversation_planning_agent
 from py_engineering_chat.research.research import crawl_and_store
 from py_engineering_chat.research.list_collections import list_collections, list_collection_content
 from py_engineering_chat.util.add_codebase import add_codebase
@@ -37,7 +35,7 @@ def chat_docs():
 @cli.command()
 def chat_planning():
     """Chat with the planning agent."""
-    chat_with_planning_agent()
+    run_conversation_planning_agent()
 
 @cli.command()
 @click.argument('url')
