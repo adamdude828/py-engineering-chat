@@ -4,8 +4,8 @@ from typing import Dict, Any
 from langchain.tools import BaseTool
 from langchain.pydantic_v1 import BaseModel, Field
 from dotenv import load_dotenv
+from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
 
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../.env'))
 
 class DirectoryStructureInput(BaseModel):
     path: str = Field(description="The path to crawl for directory structure.")
@@ -14,7 +14,7 @@ class DirectoryStructureTool(BaseTool):
     name = "directory_structure"
     description = "Crawl a directory and return its structure as a JSON object"
     args_schema: type[BaseModel] = DirectoryStructureInput
-    shadow_directory: str = Field(default_factory=lambda: os.getenv("AI_SHADOW_DIRECTORY", "/path/to/default/shadow/directory"))
+    shadow_directory: str = Field(default_factory=lambda: ChatSettingsManager().get_ai_shadow_directory())
     is_windows: bool = Field(default_factory=lambda: os.getenv("IS_WINDOWS", "false").lower() == "true")
     ignored_directories: list = Field(default_factory=lambda: os.getenv("IGNORED_DIRECTORIES", "").split(","))
 
@@ -23,6 +23,11 @@ class DirectoryStructureTool(BaseTool):
         if self.is_windows:
             return os.path.normpath(path.replace('/', '\\'))
         return os.path.normpath(path)
+
+    def _is_within_shadow_directory(self, path: str) -> bool:
+        """Check if the path is within the shadow directory."""
+        shadow_dir = os.path.abspath(self.shadow_directory)
+        return os.path.commonpath([shadow_dir, path]) == shadow_dir
 
     def _get_directory_structure(self, path: str) -> Dict[str, Any]:
         """Recursively build the directory structure."""
@@ -42,8 +47,11 @@ class DirectoryStructureTool(BaseTool):
 
     def _run(self, path: str) -> str:
         """Crawl the directory and return its structure as a JSON string."""
-        full_path = self._normalize_path(os.path.join(self.shadow_directory, path))
+        full_path = self._normalize_path(os.path.abspath(os.path.join(self.shadow_directory, path)))
         
+        if not self._is_within_shadow_directory(full_path):
+            return json.dumps({"error": "Access denied. Path is outside the shadow directory."})
+
         if not os.path.exists(full_path):
             return json.dumps({"error": f"Path '{full_path}' does not exist."})
 
@@ -55,4 +63,59 @@ class DirectoryStructureTool(BaseTool):
 
     async def _arun(self, path: str) -> str:
         """Asynchronous version of the directory structure tool."""
+        return self._run(path)
+
+
+class FileWriteInput(BaseModel):
+    path: str = Field(description="The path to the file to write to, relative to the shadow directory.")
+    content: str = Field(description="The content to write to the file.")
+
+class FileReadInput(BaseModel):
+    path: str = Field(description="The path to the file to read from, relative to the shadow directory.")
+
+class FileWriteTool(BaseTool):
+    name = "file_write"
+    description = "Write content to a file within the shadow directory"
+    args_schema: type[BaseModel] = FileWriteInput
+    shadow_directory: str = Field(default_factory=lambda: ChatSettingsManager().get_ai_shadow_directory())
+
+    def _run(self, path: str, content: str) -> str:
+        """Write content to a file."""
+        full_path = os.path.abspath(os.path.join(self.shadow_directory, path))
+
+        if not self._is_within_shadow_directory(full_path):
+            return "Error: Access denied. Path is outside the shadow directory."
+
+        try:
+            with open(full_path, 'w') as file:
+                file.write(content)
+            return f"Successfully wrote to {full_path}."
+        except Exception as e:
+            return f"Error writing to file: {str(e)}"
+
+    async def _arun(self, path: str, content: str) -> str:
+        """Asynchronous version of the file write tool."""
+        return self._run(path, content)
+
+class FileReadTool(BaseTool):
+    name = "file_read"
+    description = "Read content from a file within the shadow directory"
+    args_schema: type[BaseModel] = FileReadInput
+    shadow_directory: str = Field(default_factory=lambda: ChatSettingsManager().get_ai_shadow_directory())
+
+    def _run(self, path: str) -> str:
+        """Read content from a file."""
+        full_path = os.path.abspath(os.path.join(self.shadow_directory, path))
+
+        if not self._is_within_shadow_directory(full_path):
+            return "Error: Access denied. Path is outside the shadow directory."
+
+        try:
+            with open(full_path, 'r') as file:
+                return file.read()
+        except Exception as e:
+            return f"Error reading file: {str(e)}"
+
+    async def _arun(self, path: str) -> str:
+        """Asynchronous version of the file read tool."""
         return self._run(path)

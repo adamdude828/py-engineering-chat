@@ -12,6 +12,7 @@ from py_engineering_chat.research.list_collections import list_collections, list
 from py_engineering_chat.util.add_codebase import add_codebase
 from py_engineering_chat.research.scan_codebase import scan_codebase
 from py_engineering_chat.agents.tools_openai import run_continuous_conversation  # Import the new function
+from py_engineering_chat.util.logger_util import get_configured_logger  # Import the logger utility
 
 # Suppress the specific warning
 warnings.filterwarnings("ignore", message=".*`clean_up_tokenization_spaces` was not set.*")
@@ -22,11 +23,6 @@ load_dotenv()
 @click.group()
 def cli():
     pass
-
-@cli.command()
-def chat_basic():
-    """Chat with the basic agent."""
-    chat_with_basic_agent()
 
 @cli.command()
 def chat_tools():
@@ -49,12 +45,13 @@ def chat_planning():
 @click.option('--partition', required=True, help='Milvus partition name')
 @click.option('--keep-full-content', is_flag=True, default=True, help='Keep full content in addition to summary')
 @click.option('--debug', is_flag=True, default=False, help='Enable debug output')
-def research(url, depth, partition, keep_full_content, debug):
+@click.option('--suppress-output', is_flag=True, default=True, help='Suppress output')
+def research(url, depth, partition, keep_full_content, debug, suppress_output):
     """Crawl a URL and store the results in Milvus."""
-    crawl_and_store(url, depth, partition, keep_full_content, debug)
+    crawl_and_store(url, depth, partition, keep_full_content, debug, suppress_output)
 
 @cli.command()
-def list_collections():
+def list_chroma_collections():
     """List available collections in Chroma."""
     list_collections()
 

@@ -2,6 +2,8 @@ from langchain.tools import BaseTool
 from langchain.pydantic_v1 import BaseModel, Field
 from .shell_command_tool import SafeShellCommandTool
 from .directory_structure_tool import DirectoryStructureTool
+from .directory_structure_tool import FileWriteTool
+from .directory_structure_tool import FileReadTool
 
 class WeatherInput(BaseModel):
     location: str = Field(description="The name of the location to get weather for. This can be a city, state, country, or any recognizable place name.")
@@ -22,8 +24,12 @@ class FakeWeatherTool(BaseTool):
 def get_tools():
     # ... existing tools ...
     directory_structure_tool = DirectoryStructureTool()
+    file_write_tool = FileWriteTool()
+    file_read_tool = FileReadTool()
     
     return [
         # ... existing tools ...,
         directory_structure_tool,
+        file_write_tool,
+        file_read_tool,
     ]

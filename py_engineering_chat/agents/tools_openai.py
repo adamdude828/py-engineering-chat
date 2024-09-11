@@ -7,6 +7,8 @@ from py_engineering_chat.agents.tools_agent import get_tools
 from langgraph.graph.message import add_messages
 from langchain_openai import ChatOpenAI
 from py_engineering_chat.util.command_parser import parse_commands
+from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager 
+from langchain_core.prompts import PromptTemplate
 
 class State(TypedDict):
     # Messages have the type "list". The `add_messages` function
@@ -19,6 +21,17 @@ class State(TypedDict):
 # Initialize the graph builder
 graph_builder = StateGraph(State)
 
+prompt = PromptTemplate.from_template("""
+You are a helpful assistant that can answer questions and help with tasks.
+You have access to the following tools:
+{tools}
+
+Conversation history: {messages}
+
+Additional contextual information to help you answer the users questions: {context}
+"""
+)
+
 # Define the LLM model and bind tools
 llm = ChatOpenAI(
     temperature=0,
@@ -26,17 +39,22 @@ llm = ChatOpenAI(
 )
 tools = get_tools()
 llm_with_tools = llm.bind_tools(tools)  # Combine model with tools
+llm_with_prompt = prompt | llm_with_tools
 
 # Define the chatbot node
 def chatbot(state: State):
-    response = llm_with_tools.invoke(state["messages"])  # Use the combined model
+    response = llm_with_prompt.invoke({
+        "tools": tools,
+        "messages": state["messages"],
+        "context": state["context"]
+    })  # Use the combined model
     return {"messages": [response]}
 
 # Add the chatbot node to the graph
 graph_builder.add_node("chatbot", chatbot)
 
-# Define a placeholder for the tools node
-tool_node = ToolNode(tools=get_tools())  # Add your tools here
+# Define the tools node
+tool_node = ToolNode(tools=tools)
 
 # Add nodes to the graph
 graph_builder.add_node("tools", tool_node)
@@ -60,7 +78,7 @@ def run_continuous_conversation():
             break
         
         # Parse the user input to get the context
-        context_data = parse_commands(user_input)
+        context_data = parse_commands(user_input, ChatSettingsManager())
         state["context"] = context_data  # Add context to the state
 
         state["messages"].append(("user", user_input))
@@ -73,4 +91,3 @@ def run_continuous_conversation():
                     state["messages"].append(("assistant", assistant_message))
 
 # Example usage
-run_continuous_conversation()

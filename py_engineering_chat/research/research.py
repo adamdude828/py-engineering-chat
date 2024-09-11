@@ -16,6 +16,31 @@ from scrapy.spiders import CrawlSpider, Rule
 from urllib.parse import urlparse
 from scrapy.signalmanager import dispatcher
 from scrapy import signals
+from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
+from py_engineering_chat.util.logger_util import get_configured_logger  # Import the logger utility
+import sys
+import os
+from contextlib import contextmanager
+
+@contextmanager
+def suppress_stdout_stderr():
+    """A context manager to suppress stdout and stderr."""
+    with open(os.devnull, 'w') as devnull:
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        try:
+            sys.stdout = devnull
+            sys.stderr = devnull
+            yield
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+
+def annotate_docs(doc_annotation):
+    manager = ChatSettingsManager()
+    path = "docs"  # Directly use "docs" at the root level
+    manager.append_to_collection(path, doc_annotation)
+    print(f"Annotated '{doc_annotation}' to the docs collection")
 
 def crawl():
     data = request.json
@@ -71,7 +96,10 @@ class WebsiteSpider(CrawlSpider):
                     print(f"Following link: {link}")  # Debug output
                 yield response.follow(link, self.parse_item, cb_kwargs={'depth': depth + 1})
 
-def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=False):
+def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=False, suppress_output=True):
+    # Initialize logger
+    logger = get_configured_logger('crawler')
+
     # Print the input parameters
     print(f"URL: {url}")
     print(f"Depth: {depth}")
@@ -87,6 +115,7 @@ def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=
 
     # Initialize Chroma client
     chroma_db_path = os.path.join(ai_shadow_directory, '.chroma_db')
+    logger.debug(f"Chroma DB Path: {chroma_db_path}")
     client = chromadb.PersistentClient(path=chroma_db_path)
 
     # Check if the collection exists before deleting
@@ -123,6 +152,8 @@ def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=
                 'url': item['url'],
                 'summary': summary
             })
+        # Log each link scanned
+        logger.info(f"Scanned link: {item['url']}")
 
     # Connect the callback to the item_scraped signal
     dispatcher.connect(item_scraped, signal=signals.item_scraped)
@@ -136,8 +167,13 @@ def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=
     })
 
     # Run the spider
-    process.crawl(WebsiteSpider, start_url=url, max_depth=depth, keep_full_content=keep_full_content)
-    process.start()
+    if suppress_output:
+        with suppress_stdout_stderr():
+            process.crawl(WebsiteSpider, start_url=url, max_depth=depth, keep_full_content=keep_full_content)
+            process.start()
+    else:
+        process.crawl(WebsiteSpider, start_url=url, max_depth=depth, keep_full_content=keep_full_content)
+        process.start()
 
     # Use the collected items instead of accessing spider.items
     results = len(crawled_items)
@@ -168,6 +204,9 @@ def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=
     content_status = "full content and summaries" if keep_full_content else "summaries only"
     if debug:
         print(f"Crawled, summarized, calculated embeddings, and stored {results} pages ({content_status}) in collection '{collection_name}'")
+
+    # Example usage of annotate_docs
+    annotate_docs(collection_name)
 
 if __name__ == '__main__':
     app.run(port=3000)  # Run Flask server on port 3000

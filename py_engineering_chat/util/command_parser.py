@@ -1,3 +1,4 @@
+import re  # Add this import
 from typing import Dict, Any, Callable
 from py_engineering_chat.util.docs_search import handle_docs_query
 from py_engineering_chat.util.codebase_search import handle_codebase_query

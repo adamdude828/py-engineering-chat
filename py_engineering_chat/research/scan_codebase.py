@@ -6,6 +6,8 @@ from py_engineering_chat.agents.context_evaluator import ContextEvaluator
 from sentence_transformers import SentenceTransformer
 import json
 from dotenv import load_dotenv
+from datetime import datetime  # Import datetime for the scan date update
+from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
 
 # Configuration for directories to always skip
 ALWAYS_SKIP_DIRS = {'.git', 'node_modules', 'vendor', 'build', 'dist', 'venv', '__pycache__'}
@@ -39,6 +41,15 @@ ALWAYS_SKIP_FILES = {
 def scan_codebase(project_name, skip_summarization=False, max_files=-1):
     # Load environment variables
     load_dotenv()
+    
+    # Load settings manager
+    settings_manager = ChatSettingsManager()
+    settings_manager.load_settings()
+    
+    # Retrieve project directory from settings
+    project_dir = settings_manager.get_setting(f'projects.{project_name}.directory')
+    if not project_dir:
+        raise ValueError(f"Directory for project '{project_name}' not found in settings.")
     
     # Get AI_SHADOW_DIRECTORY from environment variables
     ai_shadow_directory = os.getenv('AI_SHADOW_DIRECTORY')
@@ -90,7 +101,7 @@ def scan_codebase(project_name, skip_summarization=False, max_files=-1):
             continue
 
         # Remove ignored directories during traversal
-        dirs[:] = [d for d in dirs if os.path.join(root, d) not in ignored_dirs and d not in ALWAYS_SKIP_DIRS]
+        dirs[:] = [d for d in dirs if os.path.join(root, d) not in ALWAYS_SKIP_DIRS and d not in ALWAYS_SKIP_DIRS]
         
         for file in files:
             # Check if we've reached the max file count (if set)
@@ -156,5 +167,15 @@ def scan_codebase(project_name, skip_summarization=False, max_files=-1):
     # Check if the collection is empty
     if collection.count() == 0:
         print("Warning: The collection is empty. No files were added.")
+
+    # Load settings manager
+    settings_manager = ChatSettingsManager()
+    settings = settings_manager.load_settings()
+
+    # After scanning is complete
+    if collection.count() > 0:
+        # Update the project's scanned status and scan date
+        settings_manager.set_setting(f'projects.{project_name}.scanned', True)
+        settings_manager.set_setting(f'projects.{project_name}.last_scanned', datetime.now().isoformat())
 
     return collection

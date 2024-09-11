@@ -1,8 +1,17 @@
+import os
 import chromadb
 
 def list_collections():
     """List available collections in Chroma."""
-    client = chromadb.PersistentClient(path="./.chroma_db")
+    # Get AI_SHADOW_DIRECTORY from environment variables
+    ai_shadow_directory = os.getenv('AI_SHADOW_DIRECTORY')
+    if not ai_shadow_directory:
+        raise ValueError("AI_SHADOW_DIRECTORY environment variable is not set")
+
+    # Construct the Chroma DB path
+    chroma_db_path = os.path.join(ai_shadow_directory, '.chroma_db')
+
+    client = chromadb.PersistentClient(path=chroma_db_path)
     collections = client.list_collections()
     if collections:
         print("Available collections in Chroma:")
@@ -22,7 +31,15 @@ import os
 
 def list_collection_content(collection_name):
     """List content of a specific collection in Chroma and save to a JSON file."""
-    client = chromadb.PersistentClient(path="./.chroma_db")
+    # Get AI_SHADOW_DIRECTORY from environment variables
+    ai_shadow_directory = os.getenv('AI_SHADOW_DIRECTORY')
+    if not ai_shadow_directory:
+        raise ValueError("AI_SHADOW_DIRECTORY environment variable is not set")
+
+    # Construct the Chroma DB path
+    chroma_db_path = os.path.join(ai_shadow_directory, '.chroma_db')
+
+    client = chromadb.PersistentClient(path=chroma_db_path)
     try:
         collection = client.get_collection(name=collection_name)
         results = collection.get()

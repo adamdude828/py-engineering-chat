@@ -5,18 +5,26 @@ from dotenv import load_dotenv
 
 class ChatSettingsManager:
     def __init__(self):
-        root_dir = Path(__file__).resolve().parents[2]
-        env_path = root_dir / '.env'
-        load_dotenv(dotenv_path=env_path)
-        print(root_dir)
-
-        self.shadow_dir = os.getenv('AI_SHADOW_DIRECTORY', './ai_shadow')
-        if not self.shadow_dir:
-            raise ValueError("AI_SHADOW_DIRECTORY environment variable is not set")
-        
+        self.shadow_dir = ChatSettingsManager.get_ai_shadow_directory()
         self.shadow_path = Path(self.shadow_dir)
         self.shadow_path.mkdir(parents=True, exist_ok=True)
         self.chat_settings_file = self.shadow_path / '.chat_settings'
+
+    @staticmethod
+    def load_env():
+        """Load environment variables from a .env file."""
+        root_dir = Path(__file__).resolve().parents[2]
+        env_path = root_dir / '.env'
+        load_dotenv(dotenv_path=env_path)
+
+    @staticmethod
+    def get_ai_shadow_directory() -> str:
+        """Return the path of the AI shadow directory."""
+        ChatSettingsManager.load_env()  # Ensure .env is loaded
+        shadow_dir = os.getenv('AI_SHADOW_DIRECTORY', './ai_shadow')
+        if not shadow_dir:
+            raise ValueError("AI_SHADOW_DIRECTORY environment variable is not set")
+        return shadow_dir
 
     def load_settings(self):
         if self.chat_settings_file.exists():
@@ -35,7 +43,8 @@ class ChatSettingsManager:
         
         settings['projects'][project_name] = {
             'directory': directory,
-            'github_origin': github_origin
+            'github_origin': github_origin,
+            'scanned': False  # Indicate the codebase is not scanned
         }
         
         self.save_settings(settings)
@@ -71,3 +80,27 @@ class ChatSettingsManager:
         current[keys[-1]] = value
         self.save_settings(settings)
         print(f"Updated setting: {path} = {value}")
+
+    def append_to_collection(self, path, value):
+        """
+        Append a value to a list in the settings using dot notation.
+        Example: append_to_collection('projects.my_project.docs', 'langchain')
+        """
+        settings = self.load_settings()
+        keys = path.split('.')
+        current = settings
+        for key in keys[:-1]:
+            if key not in current:
+                current[key] = {}
+            current = current[key]
+        
+        # Ensure the last key is a list
+        if keys[-1] not in current:
+            current[keys[-1]] = []
+        elif not isinstance(current[keys[-1]], list):
+            raise ValueError(f"The path '{path}' does not point to a list.")
+        
+        # Append the value
+        current[keys[-1]].append(value)
+        self.save_settings(settings)
+        print(f"Appended '{value}' to {path}")
