@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import logging
 
 class ChatSettingsManager:
     def __init__(self):
@@ -9,6 +10,21 @@ class ChatSettingsManager:
         self.shadow_path = Path(self.shadow_dir)
         self.shadow_path.mkdir(parents=True, exist_ok=True)
         self.chat_settings_file = self.shadow_path / '.chat_settings'
+        self.logger = self._initialize_logger()
+
+    def _initialize_logger(self) -> logging.Logger:
+        """Initialize a basic logger for internal use."""
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.DEBUG)  # Default to DEBUG for internal logging
+
+        # Create a console handler for simplicity
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
+        return logger
 
     @staticmethod
     def load_env():
@@ -58,11 +74,15 @@ class ChatSettingsManager:
         settings = self.load_settings()
         keys = path.split('.')
         value = settings
+        self.logger.debug(f"Attempting to retrieve setting for path: {path}")
         for key in keys:
             if isinstance(value, dict) and key in value:
                 value = value[key]
+                self.logger.debug(f"Found key '{key}': {value}")
             else:
+                self.logger.error(f"Key '{key}' not found in settings. Returning default value: {default}")
                 return default
+        self.logger.debug(f"Successfully retrieved value for path '{path}': {value}")
         return value
 
     def set_setting(self, path, value):
@@ -104,3 +124,33 @@ class ChatSettingsManager:
         current[keys[-1]].append(value)
         self.save_settings(settings)
         print(f"Appended '{value}' to {path}")
+
+    def get_shadow_directory(self) -> str:
+        """Return the shadow directory path."""
+        return self.shadow_directory
+
+    def get_logger(self, name: str) -> logging.Logger:
+        """Return a configured logger for the given name."""
+        shadow_dir = Path(self.get_ai_shadow_directory())
+        log_file_path = shadow_dir / 'chat.log'
+        
+        # Determine the logging level
+        log_level_str = self.get_setting('log_level', 'CRITICAL').upper()
+        log_level = getattr(logging, log_level_str, logging.CRITICAL)
+
+        # Create a logger
+        logger = logging.getLogger(name)
+        logger.setLevel(log_level)  # Set the logging level
+
+        # Create a file handler
+        file_handler = logging.FileHandler(log_file_path)
+        file_handler.setLevel(log_level)
+
+        # Create a logging format
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+
+        # Add the file handler to the logger
+        logger.addHandler(file_handler)
+
+        return logger

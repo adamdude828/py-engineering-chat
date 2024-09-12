@@ -9,7 +9,7 @@ from py_engineering_chat.research.research import crawl_and_store
 from py_engineering_chat.research.list_collections import list_collections, list_collection_content
 from py_engineering_chat.util.add_codebase import add_codebase
 from py_engineering_chat.research.scan_codebase import scan_codebase
-from py_engineering_chat.agents.tools_openai import run_continuous_conversation  # Import the new function
+from py_engineering_chat.agents.general_agent import run_continuous_conversation  # Import the new function
 from py_engineering_chat.util.logger_util import get_configured_logger  # Import the logger utility
 
 # Suppress the specific warning
@@ -23,7 +23,7 @@ def cli():
     pass
 
 @cli.command()
-def chat_tools():
+def chat_general():
     """Chat with the tools agent."""
     run_continuous_conversation()  # Call the new function
 
