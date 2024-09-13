@@ -22,29 +22,51 @@ class State(TypedDict):
 graph_builder = StateGraph(State)
 
 prompt = PromptTemplate.from_template("""
-You are a helpful assistant specialized in programming tasks. 
-You operate using a "React" framework: Plan, Act, and Execute. 
-You have access to a set of tools designed to interact with the project's directory structure, 
+You are a helpful assistant specialized in programming tasks.
+You operate using a "React" framework: Plan, Act, and Execute.
+You have access to a set of tools designed to interact with the project's directory structure,
 read and write files, and perform other project-specific operations:
 {tools}
 
-If any of the tools produce an error, don't repeat the tool call.  Just say there was an error.
+If any of the tools produce an error, don't repeat the tool call. Just say there was an error.
 
 Conversation history: {messages}
 
 Additional contextual information to help you answer the user's questions: {context}
 
 When a task is presented, you will:
-1. Plan: Analyze the task and determine the necessary steps.
-2. Act: Use the available tools to perform actions.
-3. Execute: Deliver the results and provide feedback.
-"""
-)
+
+1. **Plan**: Analyze the task and determine the necessary steps.
+
+2. **Act**: Use the available tools to perform actions.
+
+   - For **read actions**: proceed without needing additional permission.
+   - For **write actions**: before performing any write operation:
+     - **Check Git Branch**: Determine if the current Git branch is the main branch or a feature branch.
+     - **If on the main branch**:
+       - Offer to switch to a new feature branch.
+       - Suggest a branch name relevant to the task (e.g., `feature/add-login`).
+       - Ask the user for permission to create and switch to the new branch.
+     - **If on a feature branch**:
+       - Confirm with the user before proceeding.
+     - **Ask for Permission**: Before any write action, request the user's approval.
+
+   - **Do not include raw tool outputs** in your responses.
+   - **Summarize** the results of tool actions in a clear and concise manner.
+   - **Avoid displaying any internal errors or stack traces**; provide a user-friendly error message if needed.
+
+3. **Execute**: Deliver the results and provide feedback.
+
+   - Summarize the actions taken.
+   - Inform the user of any changes made.
+   - If permission was denied, explain which actions were not performed.
+""")
 
 # Define the LLM model and bind tools
 llm = ChatOpenAI(
     temperature=0,
-    model_name="gpt-4o"
+    model_name="gpt-4o",
+    verbose=False
 )
 tools = get_tools()
 llm_with_tools = llm.bind_tools(tools)  # Combine model with tools
@@ -96,7 +118,8 @@ def run_continuous_conversation():
             for value in event.values():
                 if isinstance(value["messages"][-1], BaseMessage):
                     assistant_message = value["messages"][-1].content
-                    print("Assistant:", assistant_message)
+                    # Add ANSI escape code for color (e.g., green)
+                    print("\033[92mAssistant:\033[0m", assistant_message)
                     state["messages"].append(("assistant", assistant_message))
 
 # Example usage

@@ -15,11 +15,11 @@ class ChatSettingsManager:
     def _initialize_logger(self) -> logging.Logger:
         """Initialize a basic logger for internal use."""
         logger = logging.getLogger(__name__)
-        logger.setLevel(logging.DEBUG)  # Default to DEBUG for internal logging
+        logger.setLevel(logging.CRITICAL)  # Default to DEBUG for internal logging
 
         # Create a console handler for simplicity
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)
+        console_handler.setLevel(logging.CRITICAL)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
