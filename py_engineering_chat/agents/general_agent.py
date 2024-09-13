@@ -1,4 +1,4 @@
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, AIMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from typing import Annotated
@@ -116,7 +116,7 @@ def run_continuous_conversation():
         
         for event in graph.stream(state, config):
             for value in event.values():
-                if isinstance(value["messages"][-1], BaseMessage):
+                if isinstance(value["messages"][-1], AIMessage):
                     assistant_message = value["messages"][-1].content
                     # Add ANSI escape code for color (e.g., green)
                     print("\033[92mAssistant:\033[0m", assistant_message)
