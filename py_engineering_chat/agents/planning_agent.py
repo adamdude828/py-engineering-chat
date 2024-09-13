@@ -64,3 +64,6 @@ def run_conversation():
                     assistant_message = value["messages"][-1].content
                     print("Assistant:", assistant_message)
                     state["messages"].append(AIMessage(content=assistant_message))
+
+if __name__ == "__main__":
+    run_conversation()
