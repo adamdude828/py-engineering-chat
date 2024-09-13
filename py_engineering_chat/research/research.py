@@ -8,19 +8,12 @@ import os
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from py_engineering_chat.agents.text_summarizer import TextSummarizer
-
-import scrapy
-from scrapy.crawler import CrawlerProcess
-from scrapy.linkextractors import LinkExtractor
-from scrapy.spiders import CrawlSpider, Rule
-from urllib.parse import urlparse
-from scrapy.signalmanager import dispatcher
-from scrapy import signals
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
-from py_engineering_chat.util.logger_util import get_configured_logger  # Import the logger utility
+from py_engineering_chat.util.logger_util import get_configured_logger
 import sys
-import os
 from contextlib import contextmanager
+
+from py_engineering_chat.research.web_crawler import WebCrawler  # Import the WebCrawler class
 
 @contextmanager
 def suppress_stdout_stderr():
@@ -54,49 +47,7 @@ def crawl():
     crawl_and_store(url, depth, collection_name)
     return jsonify({"message": "Crawling started"}), 200
 
-class WebsiteSpider(CrawlSpider):
-    name = 'website_spider'
-
-    custom_settings = {
-        'SPIDER_MIDDLEWARES': {
-            'scrapy.spidermiddlewares.offsite.OffsiteMiddleware': None,
-        }
-    }
-    
-    def __init__(self, start_url, max_depth, debug=False, *args, **kwargs):
-        self.start_urls = [start_url]
-        parsed_url = urlparse(start_url)
-        self.allowed_domains = [parsed_url.hostname]
-        self.port = parsed_url.port if parsed_url.port else 80
-        self.max_depth = max_depth
-        self.debug = debug  # Store debug as an instance variable
-        
-        WebsiteSpider.rules = (
-            Rule(LinkExtractor(), callback='parse_item', follow=True, cb_kwargs={'depth': 0}),
-        )
-        super(WebsiteSpider, self).__init__(*args, **kwargs)
-
-    def parse_item(self, response, depth):
-        if not response.body:
-            self.logger.warning(f"Empty response from {response.url}")
-            return
-
-        if depth == 0:  # Only yield on the first depth
-            if self.debug:  # Use self.debug instead of debug
-                print(f"Crawling: {response.url}")  # Debug output
-            yield {
-                'url': response.url,
-                'content': ' '.join(response.css('*::text').getall())
-            }
-            return  # Prevent further processing for depth 0
-
-        if depth < self.max_depth:
-            for link in response.css('a::attr(href)').getall():
-                if self.debug:  # Use self.debug instead of debug
-                    print(f"Following link: {link}")  # Debug output
-                yield response.follow(link, self.parse_item, cb_kwargs={'depth': depth + 1})
-
-def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=False, suppress_output=True):
+def crawl_and_store(url, depth, collection_name, debug=False, suppress_output=True, max_urls=None):
     # Initialize logger
     logger = get_configured_logger('crawler')
 
@@ -135,45 +86,20 @@ def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=
     # Initialize TextSummarizer
     summarizer = TextSummarizer()
 
-    # Initialize a list to store the crawled items
+    # Initialize WebCrawler
+    crawler = WebCrawler(starting_url=url, max_depth=depth, max_urls=max_urls or 100)
+
+    # Crawl the web and collect items
     crawled_items = []
-
-    # Define a callback function to collect items
-    def item_scraped(item, response, spider):
-        summary = summarizer.summarize(item['content'])
-        if keep_full_content:
-            crawled_items.append({
-                'url': item['url'],
-                'content': item['content'],
-                'summary': summary
-            })
-        else:
-            crawled_items.append({
-                'url': item['url'],
-                'summary': summary
-            })
+    for crawled_url, response in crawler.crawl():
+        #summary = summarizer.summarize(response.text)
+        #print(f"Summary: {summary}")
+        crawled_items.append({
+            'url': crawled_url,
+            'content': response.text,
+        })
         # Log each link scanned
-        logger.info(f"Scanned link: {item['url']}")
-
-    # Connect the callback to the item_scraped signal
-    dispatcher.connect(item_scraped, signal=signals.item_scraped)
-
-    # Set up the crawler
-    process = CrawlerProcess(settings={
-        'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'ROBOTSTXT_OBEY': False,  # Disable obeying robots.txt
-        'CONCURRENT_REQUESTS': 32,
-        'DOWNLOAD_DELAY': 3,
-    })
-
-    # Run the spider
-    if suppress_output:
-        with suppress_stdout_stderr():
-            process.crawl(WebsiteSpider, start_url=url, max_depth=depth, keep_full_content=keep_full_content)
-            process.start()
-    else:
-        process.crawl(WebsiteSpider, start_url=url, max_depth=depth, keep_full_content=keep_full_content)
-        process.start()
+        logger.info(f"Scanned link: {crawled_url}")
 
     # Use the collected items instead of accessing spider.items
     results = len(crawled_items)
@@ -186,10 +112,7 @@ def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=
         print("No documents to process. Exiting.")
         return
 
-    if keep_full_content:
-        metadatas = [{"url": item['url'], "full_content": item['content']} for item in crawled_items]
-    else:
-        metadatas = [{"url": item['url']} for item in crawled_items]
+    metadatas = [{"url": item['url']} for item in crawled_items]
     
     # Calculate embeddings
     embeddings = model.encode(documents)
@@ -201,9 +124,8 @@ def crawl_and_store(url, depth, collection_name, keep_full_content=False, debug=
         metadatas=metadatas
     )
 
-    content_status = "full content and summaries" if keep_full_content else "summaries only"
     if debug:
-        print(f"Crawled, summarized, calculated embeddings, and stored {results} pages ({content_status}) in collection '{collection_name}'")
+        print(f"Crawled, summarized, calculated embeddings, and stored {results} pages (summaries only) in collection '{collection_name}'")
 
     # Example usage of annotate_docs
     annotate_docs(collection_name)

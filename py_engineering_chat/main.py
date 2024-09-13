@@ -11,6 +11,8 @@ from py_engineering_chat.util.add_codebase import add_codebase
 from py_engineering_chat.research.scan_codebase import scan_codebase
 from py_engineering_chat.agents.general_agent import run_continuous_conversation  # Import the new function
 from py_engineering_chat.util.logger_util import get_configured_logger  # Import the logger utility
+import requests
+from py_engineering_chat.agents.text_summarizer import TextSummarizer
 
 # Suppress the specific warning
 warnings.filterwarnings("ignore", message=".*`clean_up_tokenization_spaces` was not set.*")
@@ -41,12 +43,12 @@ def chat_planning():
 @click.argument('url')
 @click.option('--depth', default=1, help='Crawl depth')
 @click.option('--partition', required=True, help='Milvus partition name')
-@click.option('--keep-full-content', is_flag=True, default=True, help='Keep full content in addition to summary')
 @click.option('--debug', is_flag=True, default=False, help='Enable debug output')
 @click.option('--suppress-output', is_flag=True, default=True, help='Suppress output')
-def research(url, depth, partition, keep_full_content, debug, suppress_output):
+@click.option('--max-urls', type=int, default=None, help='Maximum number of URLs to crawl')  # New option
+def research(url, depth, partition, debug, suppress_output, max_urls):
     """Crawl a URL and store the results in Milvus."""
-    crawl_and_store(url, depth, partition, keep_full_content, debug, suppress_output)
+    crawl_and_store(url, depth, partition, debug, suppress_output, max_urls)
 
 @cli.command()
 def list_chroma_collections():
@@ -74,6 +76,29 @@ def add_codebase_command(project_name, directory, github_origin):
 def scan_project(project_name, skip_summarization, max_file_count):
     """Scan a project's codebase and store in Chroma."""
     scan_codebase(project_name, skip_summarization, max_file_count)
+
+@cli.command()
+@click.argument('url')
+def summarize_url(url):
+    """Fetch content from a URL, summarize it, and output the result."""
+    try:
+        # Fetch content from the URL
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an error for bad responses
+        content = response.text
+
+        # Initialize the TextSummarizer
+        summarizer = TextSummarizer()
+
+        # Summarize the content
+        summary = summarizer(content)
+
+        # Output the summarized chunks
+        print("Summarized Chunks:")
+        for chunk in summary.chunks:
+            print(chunk)
+    except requests.RequestException as e:
+        print(f"Failed to fetch content from URL: {e}", file=sys.stderr)
 
 if __name__ == "__main__":
     try:
