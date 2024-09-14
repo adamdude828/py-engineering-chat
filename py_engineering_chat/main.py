@@ -13,6 +13,7 @@ from py_engineering_chat.agents.general_agent import run_continuous_conversation
 from py_engineering_chat.util.logger_util import get_configured_logger  # Import the logger utility
 import requests
 from py_engineering_chat.agents.text_summarizer import TextSummarizer
+from py_engineering_chat.util.content_chunker import ContentChunker  # Import the ContentChunker class
 
 # Suppress the specific warning
 warnings.filterwarnings("ignore", message=".*`clean_up_tokenization_spaces` was not set.*")
@@ -81,24 +82,32 @@ def scan_project(project_name, skip_summarization, max_file_count):
 @click.argument('url')
 def summarize_url(url):
     """Fetch content from a URL, summarize it, and output the result."""
+    logger = get_configured_logger('summarize_url')
     try:
         # Fetch content from the URL
         response = requests.get(url)
         response.raise_for_status()  # Raise an error for bad responses
-        content = response.text
+        html_content = response.text
 
-        # Initialize the TextSummarizer
-        summarizer = TextSummarizer()
+        # Initialize the ContentChunker with your OpenAI API key
+        openai_api_key = os.getenv("OPENAI_API_KEY")  # Ensure your .env file has this key
+        chunker = ContentChunker(openai_api_key=openai_api_key)
 
-        # Summarize the content
-        summary = summarizer(content)
+        # Process the HTML content
+        plain_text_chunks = chunker.process_html(html_content)
 
-        # Output the summarized chunks
-        print("Summarized Chunks:")
-        for chunk in summary.chunks:
-            print(chunk)
+        # Output the plain text with added spaces and color
+        logger.info(f"Processed {len(plain_text_chunks)} chunks from URL: {url}")
+        print("Processed Text:")
+        colors = ["\033[94m", "\033[92m", "\033[91m"]  # Blue, Green, and Red colors
+        for i, chunk in enumerate(plain_text_chunks):
+            color = colors[i % len(colors)]  # Alternate between colors
+            print(color + chunk.chunk + "\033[0m\n")  # Apply color and a newline for spacing
     except requests.RequestException as e:
+        logger.error(f"Failed to fetch content from URL: {e}", exc_info=True)
         print(f"Failed to fetch content from URL: {e}", file=sys.stderr)
+
+
 
 if __name__ == "__main__":
     try:

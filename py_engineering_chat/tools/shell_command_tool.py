@@ -20,6 +20,11 @@ class SafeShellCommandTool(BaseProjectTool):  # Inherit from BaseProjectTool
         if not os.path.exists(self.shadow_directory):
             return f"Error: Shadow directory '{self.shadow_directory}' does not exist."
 
+        # Confirm before executing the command
+        confirm = input(f"Are you sure you want to execute the command: '{command}'? (yes/no): ")
+        if confirm.lower() != 'yes':
+            return "Command execution cancelled by user."
+
         try:
             # Change to the shadow directory
             os.chdir(self.shadow_directory)

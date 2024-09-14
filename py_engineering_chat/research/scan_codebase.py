@@ -86,9 +86,10 @@ def scan_codebase(project_name, skip_summarization=False, max_files=-1):
     logger.debug("ContextEvaluator initialized.")
 
     # Initialize TextSummarizer only if needed
-    summarizer = None if skip_summarization else TextSummarizer()
-    if summarizer:
-        logger.debug("TextSummarizer initialized.")
+    # Remove the summarizer initialization
+    # summarizer = None if skip_summarization else TextSummarizer()
+    # if summarizer:
+    #     logger.debug("TextSummarizer initialized.")
     
     # Initialize SentenceTransformer model
     model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -147,24 +148,28 @@ def scan_codebase(project_name, skip_summarization=False, max_files=-1):
                 logger.debug(f"Reading file: {relative_path}")
                 content = f.read()
 
-            if summarizer:
-                try:
-                    summary = summarizer.summarize(content)
-                except Exception as e:
-                    logger.error(f"Error summarizing file {relative_path}: {e}")
-                    summary = content[:1000]  # Fallback to using first 1000 characters
-            else:
-                summary = content[:1000]  # Use first 1000 characters as summary
+            # Include the file path with the content
+            content_with_path = f"Path: {relative_path}\n\n{content}"
+
+            # Remove summarization logic
+            # if summarizer:
+            #     try:
+            #         summary = summarizer.summarize(content)
+            #     except Exception as e:
+            #         logger.error(f"Error summarizing file {relative_path}: {e}")
+            #         summary = content[:1000]  # Fallback to using first 1000 characters
+            # else:
+            #     summary = content[:1000]  # Use first 1000 characters as summary
 
             # Calculate embedding
-            embedding = model.encode(summary).tolist()
+            embedding = model.encode(content).tolist()  # Use full content for embedding
             
             # Add to collection
             collection.add(
                 ids=[str(relative_path)],
-                documents=[content],
+                documents=[content_with_path],  # Store content with path
                 embeddings=[embedding],
-                metadatas=[{"path": str(relative_path), "summary": summary}]
+                metadatas=[{"path": str(relative_path)}]  # Remove summary from metadata
             )
             files_processed += 1
             logger.debug(f"Processed file: {relative_path}")

@@ -12,6 +12,7 @@ from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
 from py_engineering_chat.util.logger_util import get_configured_logger
 import sys
 from contextlib import contextmanager
+from py_engineering_chat.util.content_chunker import ContentChunker  # Import ContentChunker
 
 from py_engineering_chat.research.web_crawler import WebCrawler  # Import the WebCrawler class
 
@@ -51,84 +52,99 @@ def crawl_and_store(url, depth, collection_name, debug=False, suppress_output=Tr
     # Initialize logger
     logger = get_configured_logger('crawler')
 
-    # Print the input parameters
-    print(f"URL: {url}")
-    print(f"Depth: {depth}")
-    print(f"Collection: {collection_name}")
+    try:
+        # Initialize logger
+        logger = get_configured_logger('crawler')
 
-    # Load environment variables
-    load_dotenv(dotenv_path='../.env')
+        # Print the input parameters
+        print(f"URL: {url}")
+        print(f"Depth: {depth}")
+        print(f"Collection: {collection_name}")
 
-    # Get AI_SHADOW_DIRECTORY from environment variables
-    ai_shadow_directory = os.getenv('AI_SHADOW_DIRECTORY')
-    if not ai_shadow_directory:
-        raise ValueError("AI_SHADOW_DIRECTORY environment variable is not set")
+        # Load environment variables
+        load_dotenv(dotenv_path='../.env')
 
-    # Initialize Chroma client
-    chroma_db_path = os.path.join(ai_shadow_directory, '.chroma_db')
-    logger.debug(f"Chroma DB Path: {chroma_db_path}")
-    client = chromadb.PersistentClient(path=chroma_db_path)
+        # Get AI_SHADOW_DIRECTORY from environment variables
+        ai_shadow_directory = os.getenv('AI_SHADOW_DIRECTORY')
+        if not ai_shadow_directory:
+            raise ValueError("AI_SHADOW_DIRECTORY environment variable is not set")
 
-    # Check if the collection exists before deleting
-    collections = client.list_collections()
-    if collection_name in [col.name for col in collections]:
-        client.delete_collection(name=collection_name)
-        print(f"Deleted existing collection '{collection_name}'.")
-    else:
-        print(f"Collection '{collection_name}' does not exist.")
+        # Initialize Chroma client
+        chroma_db_path = os.path.join(ai_shadow_directory, '.chroma_db')
+        logger.debug(f"Chroma DB Path: {chroma_db_path}")
+        client = chromadb.PersistentClient(path=chroma_db_path)
 
-    # Create a new collection
-    collection = client.create_collection(name=collection_name)
+        # Check if the collection exists before deleting
+        collections = client.list_collections()
+        if collection_name in [col.name for col in collections]:
+            client.delete_collection(name=collection_name)
+            print(f"Deleted existing collection '{collection_name}'.")
+        else:
+            print(f"Collection '{collection_name}' does not exist.")
 
-    # Initialize SentenceTransformer model
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+        # Create a new collection
+        collection = client.create_collection(name=collection_name)
 
-    # Initialize TextSummarizer
-    summarizer = TextSummarizer()
+        # Initialize SentenceTransformer model
+        model = SentenceTransformer('all-MiniLM-L6-v2')
 
-    # Initialize WebCrawler
-    crawler = WebCrawler(starting_url=url, max_depth=depth, max_urls=max_urls or 100)
+        # Initialize TextSummarizer
+        summarizer = TextSummarizer()
 
-    # Crawl the web and collect items
-    crawled_items = []
-    for crawled_url, response in crawler.crawl():
-        #summary = summarizer.summarize(response.text)
-        #print(f"Summary: {summary}")
-        crawled_items.append({
-            'url': crawled_url,
-            'content': response.text,
-        })
-        # Log each link scanned
-        logger.info(f"Scanned link: {crawled_url}")
+        # Initialize WebCrawler
+        crawler = WebCrawler(starting_url=url, max_depth=depth, max_urls=max_urls or 100)
 
-    # Use the collected items instead of accessing spider.items
-    results = len(crawled_items)
+        # Initialize ContentChunker
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        chunker = ContentChunker(openai_api_key=openai_api_key)
 
-    # Modify the data preparation for Chroma
-    ids = [str(i) for i in range(results)]
-    documents = [item['summary'] for item in crawled_items]
+        # Crawl the web and collect items
+        crawled_items = []
+        for result in crawler.crawl():
+            crawled_url, html_content = result  # Adjust to receive raw HTML content
+            logger.info(f"Scanned link: {crawled_url}")
 
-    if not documents:
-        print("No documents to process. Exiting.")
-        return
+            # Process the HTML content using ContentChunker
+            plain_text_chunks = chunker.process_html(html_content)
 
-    metadatas = [{"url": item['url']} for item in crawled_items]
-    
-    # Calculate embeddings
-    embeddings = model.encode(documents)
+            for chunk in plain_text_chunks:
+                crawled_items.append({
+                    'url': crawled_url,
+                    'content': chunk.chunk,
+                })
 
-    collection.add(
-        ids=ids,
-        documents=documents,
-        embeddings=embeddings.tolist(),
-        metadatas=metadatas
-    )
+        # Use the collected items instead of accessing spider.items
+        results = len(crawled_items)
 
-    if debug:
-        print(f"Crawled, summarized, calculated embeddings, and stored {results} pages (summaries only) in collection '{collection_name}'")
+        # Modify the data preparation for Chroma
+        ids = [str(i) for i in range(results)]
+        documents = [item['summary'] for item in crawled_items]
 
-    # Example usage of annotate_docs
-    annotate_docs(collection_name)
+        if not documents:
+            print("No documents to process. Exiting.")
+            return
+
+        metadatas = [{"url": item['url']} for item in crawled_items]
+        
+        # Calculate embeddings
+        embeddings = model.encode(documents)
+
+        collection.add(
+            ids=ids,
+            documents=documents,
+            embeddings=embeddings.tolist(),
+            metadatas=metadatas
+        )
+
+        if debug:
+            logger.debug(f"Crawled, summarized, calculated embeddings, and stored {results} pages (summaries only) in collection '{collection_name}'")
+
+        # Example usage of annotate_docs
+        annotate_docs(collection_name)
+
+    except Exception as e:
+        logger.error(f"An error occurred during crawling: {e}", exc_info=True)
+        raise
 
 if __name__ == '__main__':
     app.run(port=3000)  # Run Flask server on port 3000

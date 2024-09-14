@@ -12,6 +12,11 @@ class ChatSettingsManager:
         self.chat_settings_file = self.shadow_path / '.chat_settings'
         self.logger = self._initialize_logger()
 
+    def get_project_shadow_directory(self) -> str:
+        current_project = self.get_setting('current_project')
+        shadow_directory = self.get_setting(f'projects.{current_project}.shadow_directory')
+        return os.path.abspath(shadow_directory)
+
     def _initialize_logger(self) -> logging.Logger:
         """Initialize a basic logger for internal use."""
         logger = logging.getLogger(__name__)
@@ -120,10 +125,10 @@ class ChatSettingsManager:
         elif not isinstance(current[keys[-1]], list):
             raise ValueError(f"The path '{path}' does not point to a list.")
         
-        # Append the value
-        current[keys[-1]].append(value)
-        self.save_settings(settings)
-        print(f"Appended '{value}' to {path}")
+        # Check for duplicates before appending
+        if value not in current[keys[-1]]:
+            current[keys[-1]].append(value)
+            self.save_settings(settings)
 
     def get_shadow_directory(self) -> str:
         """Return the shadow directory path."""
@@ -154,3 +159,10 @@ class ChatSettingsManager:
         logger.addHandler(file_handler)
 
         return logger
+
+    def get_docs_options(self) -> list:
+        """
+        Retrieve the list of documentation options from the settings.
+        """
+        docs = self.get_setting('docs', [])
+        return [f":{doc}" for doc in docs]

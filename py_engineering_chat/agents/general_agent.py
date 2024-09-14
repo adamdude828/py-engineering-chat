@@ -9,6 +9,11 @@ from py_engineering_chat.util.command_parser import parse_commands
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager 
 from langchain_core.prompts import PromptTemplate
 from py_engineering_chat.tools.custom_tools import get_tools
+from prompt_toolkit import PromptSession
+from py_engineering_chat.util.file_completer import FileCompleter
+from py_engineering_chat.util.enter_key_bindings import kb
+from py_engineering_chat.util.context_model import ContextData
+
 
 class State(TypedDict):
     # Messages have the type "list". The `add_messages` function
@@ -32,12 +37,12 @@ If any of the tools produce an error, don't repeat the tool call. Just say there
 
 Conversation history: {messages}
 
+Context included by user:
 Additional contextual information to help you answer the user's questions: {context}
 
 When a task is presented, you will:
 
 1. **Plan**: Analyze the task and determine the necessary steps. Some messages will be simple questions that don't require planning
-    Always confirm the plan with the user before proceeding. Always re-confirm if the plan changes.                                  
 
 2. **Act**: Use the available tools to perform actions.
 
@@ -99,28 +104,71 @@ graph_builder.add_edge("tools", "chatbot")
 # Compile the graph
 graph = graph_builder.compile()
 
+# Define ANSI color codes
+colors = [
+    '\033[91m',  # Red
+    '\033[92m',  # Green
+    '\033[93m',  # Yellow
+    '\033[94m',  # Blue
+    '\033[95m',  # Magenta
+    '\033[96m',  # Cyan
+    '\033[97m',  # White
+]
+reset_color = '\033[0m'  # Reset color
+
+
 # Function to run the graph with continuous conversation
 def run_continuous_conversation():
     state = {"messages": []}
     config = {"configurable": {"thread_id": "1"}}
-    
+    color_index = 0  # Initialize color index
+    session = PromptSession(completer=FileCompleter(), key_bindings=kb)
+
     while True:
-        user_input = input("You: ")
-        if user_input.lower() in ["exit", "quit"]:
+        try:
+            user_input = session.prompt("You: ")
+            if user_input.lower() in ["exit", "quit"]:
+                break
+
+            # Parse the user input to get the context
+            context_data_list = parse_commands(user_input, ChatSettingsManager())
+            
+            # Loop through the list and call toString on each ContextData
+            context_strings = [context_data.toString() for context_data in context_data_list]
+            state["context"] = " ".join(context_strings)
+
+            state["messages"].append(("user", user_input))
+
+            # Add extra space
+            print("\n")
+
+            # Rotate color for user message
+            color = colors[color_index % len(colors)]
+            color_index += 1
+
+            # Print user's message with color
+            print(f"{color}You:{reset_color} {user_input}")
+
+            # Process the conversation
+            for event in graph.stream(state, config):
+                for value in event.values():
+                    if isinstance(value["messages"][-1], AIMessage):
+                        assistant_message = value["messages"][-1].content
+
+                        # Rotate color for assistant message
+                        color = colors[color_index % len(colors)]
+                        color_index += 1
+
+                        # Add extra space
+                        print("\n")
+
+                        # Print assistant's message with color
+                        print(f"{color}Assistant:{reset_color} {assistant_message}")
+
+                        state["messages"].append(("assistant", assistant_message))
+
+        except KeyboardInterrupt:
+            # Handle Ctrl+C gracefully
+            print("\nExiting...")
             break
-        
-        # Parse the user input to get the context
-        context_data = parse_commands(user_input, ChatSettingsManager())
-        state["context"] = context_data  # Add context to the state
 
-        state["messages"].append(("user", user_input))
-        
-        for event in graph.stream(state, config):
-            for value in event.values():
-                if isinstance(value["messages"][-1], AIMessage):
-                    assistant_message = value["messages"][-1].content
-                    # Add ANSI escape code for color (e.g., green)
-                    print("\033[92mAssistant:\033[0m", assistant_message)
-                    state["messages"].append(("assistant", assistant_message))
-
-# Example usage

@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin, urldefrag
 import urllib.robotparser
+import os
 
 class WebCrawler:
     def __init__(self, starting_url, max_depth=2, max_urls=100):
@@ -57,8 +58,8 @@ class WebCrawler:
             self.num_urls_crawled += 1
             print(f"Crawled URL ({self.num_urls_crawled}): {url}")
 
-            # Yield the URL and response
-            yield url, response
+            # Yield the raw HTML content instead
+            yield (url, response.text)  # Yield a tuple with the URL and raw HTML content
 
             # Parse the page content for links
             soup = BeautifulSoup(response.content, 'html.parser')

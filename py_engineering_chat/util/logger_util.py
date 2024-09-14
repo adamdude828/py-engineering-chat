@@ -29,6 +29,10 @@ def get_configured_logger(name: str, to_file: bool = False) -> logging.Logger:
     handler.setFormatter(formatter)
 
     # Add the handler to the logger
-    logger.addHandler(handler)
+    if not logger.handlers:
+        logger.addHandler(handler)
+
+    # Ensure exceptions are logged
+    logger.propagate = False
 
     return logger
