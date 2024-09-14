@@ -21,8 +21,8 @@ class SafeShellCommandTool(BaseProjectTool):  # Inherit from BaseProjectTool
             return f"Error: Shadow directory '{self.shadow_directory}' does not exist."
 
         # Confirm before executing the command
-        confirm = input(f"Are you sure you want to execute the command: '{command}'? (yes/no): ")
-        if confirm.lower() != 'yes':
+        confirm = input(f"\033[92mAre you sure you want to execute the command: '{command}'? (yes/y): \033[0m")
+        if confirm.lower() not in ['yes', 'y']:
             return "Command execution cancelled by user."
 
         try:
