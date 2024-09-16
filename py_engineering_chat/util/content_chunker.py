@@ -44,6 +44,9 @@ class ContentChunker:
             messages=messages,
             response_format=ContentChunkerResponse,
         )
-        return response.choices[0].message.parsed.chunks
+        if (response.choices[0].message.parsed):
+            return response.choices[0].message.parsed.chunks
+        else:
+            return response.choices[0].message.refusal
 
 # Usage Example:

@@ -8,19 +8,17 @@ from langchain_openai import ChatOpenAI
 from py_engineering_chat.util.command_parser import parse_commands
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager 
 from langchain_core.prompts import PromptTemplate
-from py_engineering_chat.tools.custom_tools import get_tools
 from prompt_toolkit import PromptSession
 from py_engineering_chat.util.file_completer import FileCompleter
 from py_engineering_chat.util.enter_key_bindings import kb
 from py_engineering_chat.util.context_model import ContextData
+from py_engineering_chat.tools.custom_tools import get_tools
+from py_engineering_chat.util.logger_util import get_configured_logger
+
 
 
 class State(TypedDict):
-    # Messages have the type "list". The `add_messages` function
-    # in the annotation defines how this state key should be updated
-    # (in this case, it appends messages to the list, rather than overwriting them)
     messages: Annotated[list, add_messages]
-    # Context is a string that holds additional context information
     context: str
 
 # Initialize the graph builder
@@ -71,7 +69,7 @@ When a task is presented, you will:
 # Define the LLM model and bind tools
 llm = ChatOpenAI(
     temperature=0,
-    model_name="gpt-4o",
+    model_name="gpt-4",
     verbose=False
 )
 tools = get_tools()
@@ -84,27 +82,30 @@ def chatbot(state: State):
         "tools": tools,
         "messages": state["messages"],
         "context": state["context"]
-    })  # Use the combined model
+    })
     return {"messages": [response]}
 
-# Add the chatbot node to the graph
 graph_builder.add_node("chatbot", chatbot)
 
-# Define the tools node
+# Remove the CustomToolNode class and use the original ToolNode
 tool_node = ToolNode(tools=tools)
-
-# Add nodes to the graph
 graph_builder.add_node("tools", tool_node)
 
-# Define the entry and exit points
+# Update the graph edges
 graph_builder.add_edge(START, "chatbot")
-graph_builder.add_conditional_edges("chatbot", tools_condition, {"tools": "tools", "__end__": "__end__"})
+graph_builder.add_conditional_edges(
+    "chatbot",
+    tools_condition,
+    {"tools": "tools", "__end__": "__end__"}
+)
 graph_builder.add_edge("tools", "chatbot")
 
 # Compile the graph
 graph = graph_builder.compile()
 
-# Define ANSI color codes
+# The rest of your code remains mostly the same
+# ...
+# ANSI color codes
 colors = [
     '\033[91m',  # Red
     '\033[92m',  # Green
@@ -116,12 +117,11 @@ colors = [
 ]
 reset_color = '\033[0m'  # Reset color
 
-
-# Function to run the graph with continuous conversation
+# Update the run_continuous_conversation function if necessary
 def run_continuous_conversation():
-    state = {"messages": []}
+    state = {"messages": [], "tool_rejection": False, "user_feedback": ""}
     config = {"configurable": {"thread_id": "1"}}
-    color_index = 0  # Initialize color index
+    color_index = 0
     session = PromptSession(completer=FileCompleter(), key_bindings=kb)
 
     while True:
@@ -130,45 +130,26 @@ def run_continuous_conversation():
             if user_input.lower() in ["exit", "quit"]:
                 break
 
-            # Parse the user input to get the context
             context_data_list = parse_commands(user_input, ChatSettingsManager())
-            
-            # Loop through the list and call toString on each ContextData
             context_strings = [context_data.toString() for context_data in context_data_list]
             state["context"] = " ".join(context_strings)
-
             state["messages"].append(("user", user_input))
 
-            # Add extra space
             print("\n")
-
-            # Rotate color for user message
             color = colors[color_index % len(colors)]
             color_index += 1
-
-            # Print user's message with color
             print(f"{color}You:{reset_color} {user_input}")
 
-            # Process the conversation
             for event in graph.stream(state, config):
                 for value in event.values():
                     if isinstance(value["messages"][-1], AIMessage):
                         assistant_message = value["messages"][-1].content
-
-                        # Rotate color for assistant message
                         color = colors[color_index % len(colors)]
                         color_index += 1
-
-                        # Add extra space
                         print("\n")
-
-                        # Print assistant's message with color
                         print(f"{color}Assistant:{reset_color} {assistant_message}")
-
                         state["messages"].append(("assistant", assistant_message))
 
         except KeyboardInterrupt:
-            # Handle Ctrl+C gracefully
             print("\nExiting...")
             break
-
