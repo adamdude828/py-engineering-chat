@@ -99,7 +99,10 @@ class PlanningAgent:
 
 async def plan_step(state):
     planning_agent = PlanningAgent()
-    plan = planning_agent.generate_plan()
-    filename = f"task_plan_{int(time.time())}.json"
-    save_message = planning_agent.save_plan(plan, filename)
-    return {"plan": plan.dict(), "save_message": save_message}
+    try:
+        plan = planning_agent.generate_plan()
+        filename = f"task_plan_{int(time.time())}.json"
+        save_message = planning_agent.save_plan(plan, filename)
+        return {"plan": plan.dict(), "save_message": save_message, "error": ""}
+    except Exception as e:
+        return {"plan": {}, "save_message": "", "error": str(e)}
