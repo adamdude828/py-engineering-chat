@@ -5,7 +5,7 @@ from py_engineering_chat.tools.file_write_tool import FileWriteTool
 from py_engineering_chat.tools.file_read_tool import FileReadTool
 from py_engineering_chat.tools.shell_command_tool import SafeShellCommandTool
 from py_engineering_chat.tools.git_create_branch import GitCreateBranchTool
-from py_engineering_chat.tools.git_commit_changes import GitCommitChangesTool
+from py_engineering_chat.tools.git_commit_tool import GitCommitTool
 
 class WeatherInput(BaseModel):
     location: str = Field(description="The name of the location to get weather for. This can be a city, state, country, or any recognizable place name.")
@@ -29,7 +29,7 @@ def get_tools():
     file_read_tool = FileReadTool()
     shell_command_tool = SafeShellCommandTool()
     git_create_branch = GitCreateBranchTool()
-    git_commit_changes = GitCommitChangesTool()
+    git_commit_tool = GitCommitTool()
     
     return [
         directory_structure_tool,
@@ -37,5 +37,5 @@ def get_tools():
         file_read_tool,
         shell_command_tool,
         git_create_branch,
-        git_commit_changes
+        git_commit_tool
     ]
