@@ -36,10 +36,10 @@ class TieredMemory:
                 continue  # Long-term memories are not automatically moved or deleted
 
             memories = self.chroma_db.get_conversations_by_metadata({"tier": tier})
-            self.logger.debug(f"Retrieved {len(memories)} memories for tier {tier}")
+            self.logger.debug(f"Retrieved {len(memories) if memories else 0} memories for tier {tier}")
 
-            if memories is None:
-                self.logger.error(f"No memories found for tier {tier}")
+            if not memories:
+                self.logger.debug(f"No memories found for tier {tier}")
                 continue
 
             for memory in memories:
@@ -69,8 +69,8 @@ class TieredMemory:
         """Remove excess memories from a tier."""
         self.logger.debug(f"Starting _prune_tier for {tier}")
         memories = self.chroma_db.get_conversations_by_metadata({"tier": tier})
-        self.logger.debug(f"Retrieved {len(memories)} memories for pruning in tier {tier}")
-        if len(memories) > self.tiers[tier]['max_items']:
+        self.logger.debug(f"Retrieved {len(memories) if memories else 0} memories for pruning in tier {tier}")
+        if memories and len(memories) > self.tiers[tier]['max_items']:
             memories_to_remove = sorted(memories, key=lambda x: x['metadata']['timestamp'])[:-self.tiers[tier]['max_items']]
             for memory in memories_to_remove:
                 self.chroma_db.delete_conversation(memory['id'])
