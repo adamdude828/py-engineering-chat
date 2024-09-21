@@ -21,6 +21,7 @@ import time
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     context: str
+    edit_mode: bool
 
 class GeneralAgent:
     def __init__(self):
@@ -28,49 +29,32 @@ class GeneralAgent:
         self.tiered_memory = TieredMemory()
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.logger = get_configured_logger(__name__)
+        self.edit_mode = False  # Default to read-only mode
         self.setup_graph()
 
     def setup_graph(self):
         prompt = PromptTemplate.from_template("""
-        You are a helpful assistant specialized in programming tasks.
-        You operate using a "React" framework: Plan, Act, and Execute.
-        You have access to a set of tools designed to interact with the project's directory structure,
-        read and write files, and perform other project-specific operations:
+        You are a helpful assistant specialized in programming tasks. You have access to the following tools:
         {tools}
-
-        If any of the tools produce an error, don't repeat the tool call. Just say there was an error.
 
         Conversation history: {messages}
 
-        Context included by user:
-        Additional contextual information to help you answer the user's questions: {context}
+        Context: {context}
 
-        When a task is presented, you will:
+        Instructions:
+        1. Analyze the user's request and respond appropriately.
+        2. Use tools when necessary, but don't mention them explicitly in your response.
+        3. Be concise in your explanations and actions.
+        4. If edit_mode is False, do not perform any write operations.
+        5. For read operations, summarize the results briefly.
+        6. For write operations (when edit_mode is True):
+           - Confirm the current Git branch.
+           - Ask for permission before making changes.
+        7. Avoid displaying raw tool outputs or error messages.
 
-        1. **Plan**: Analyze the task and determine the necessary steps. Some messages will be simple questions that don't require planning
+        Current edit mode: {edit_mode}
 
-        2. **Act**: Use the available tools to perform actions.
-
-           - For **read actions**: ask the user if they want to proceed.
-           - For **write actions**: before performing any write operation:
-             - **Check Git Branch**: Determine if the current Git branch is the main branch or a feature branch.
-             - **If on the main branch**:
-               - Offer to switch to a new feature branch.
-               - Suggest a branch name relevant to the task (e.g., `feature/add-login`).
-               - Ask the user for permission to create and switch to the new branch.
-             - **If on a feature branch**:
-               - Confirm with the user before proceeding.
-             - **Ask for Permission**: Before any write action, request the user's approval.
-
-           - **Do not include raw tool outputs** in your responses.
-           - **Summarize** the results of tool actions in a clear and concise manner.
-           - **Avoid displaying any internal errors or stack traces**; provide a user-friendly error message if needed.
-
-        3. **Execute**: Deliver the results and provide feedback.
-
-           - Summarize the actions taken.
-           - Inform the user of any changes made.
-           - If permission was denied, explain which actions were not performed.
+        Respond to the user's request:
         """)
 
         llm = ChatOpenAI(temperature=0, model_name="gpt-4", verbose=False)
@@ -82,7 +66,8 @@ class GeneralAgent:
             response = llm_with_prompt.invoke({
                 "tools": tools,
                 "messages": state["messages"],
-                "context": state["context"]
+                "context": state["context"],
+                "edit_mode": state["edit_mode"]
             })
             return {"messages": [response]}
 
@@ -111,12 +96,18 @@ class GeneralAgent:
         context = self.tiered_memory.get_context(query_embedding, n_results)
         return "\n".join([f"{item['metadata']['role']}: {item['content']}" for item in context])
 
+    def toggle_edit_mode(self):
+        self.edit_mode = not self.edit_mode
+        mode = "enabled" if self.edit_mode else "disabled"
+        print(f"Edit mode {mode}")
+
     def run_conversation(self):
-        state = {"messages": [], "context": ""}
+        state = {"messages": [], "context": "", "edit_mode": self.edit_mode}
         config = {"configurable": {"thread_id": "1"}}
         session = PromptSession(completer=FileCompleter(), key_bindings=kb)
 
         print("Welcome to the General Agent! Type 'exit' to end the conversation.")
+        print("Type '/toggle_edit' to switch between read-only and edit modes.")
 
         while True:
             try:
@@ -124,6 +115,10 @@ class GeneralAgent:
                 if user_input.lower() == 'exit':
                     print("Goodbye!")
                     break
+                elif user_input.lower() == '/toggle_edit':
+                    self.toggle_edit_mode()
+                    state["edit_mode"] = self.edit_mode
+                    continue
 
                 context_data_list = parse_commands(user_input, ChatSettingsManager())
                 context_strings = [context_data.toString() for context_data in context_data_list]
