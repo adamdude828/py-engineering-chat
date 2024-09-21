@@ -13,13 +13,9 @@ class FileWriteTool(BaseProjectTool):
     description = "Write content to a file within the project shadow directory"
     args_schema: type[BaseModel] = FileWriteInput
 
-    def __init__(self):
-        super().__init__()
-        self.linting_router = LintingRouter()
-        self.logger = get_configured_logger(__name__)
-
     def _run(self, path: str, content: str) -> str:
-        self.logger.debug(f"Attempting to modify file: {path}")
+        logger = get_configured_logger(__name__)
+        logger.debug(f"Attempting to modify file: {path}")
         shadow_directory = self.get_project_shadow_directory()
         full_path = os.path.abspath(os.path.join(shadow_directory, path))
 
@@ -32,11 +28,14 @@ class FileWriteTool(BaseProjectTool):
             if confirmation.lower() != 'yes':
                 return "Modification cancelled by user."
 
+            # Construct LintingRouter here
+            linting_router = LintingRouter()
+
             # Lint and fix the code using the router
-            linting_passed, fixed_content = self.linting_router.lint_and_fix(path, content)
+            linting_passed, fixed_content = linting_router.lint_and_fix(path, content)
 
             if not linting_passed:
-                self.logger.warning("Linting failed after fix attempts. Write operation cancelled.")
+                logger.warning("Linting failed after fix attempts. Write operation cancelled.")
                 return False
 
             # Write the fixed content to the file
@@ -45,7 +44,7 @@ class FileWriteTool(BaseProjectTool):
 
             return f"Successfully modified and linted {full_path}."
         except Exception as e:
-            self.logger.error(f"Error modifying file: {e}")
+            logger.error(f"Error modifying file: {e}")
             return False
 
     async def _arun(self, path: str, content: str) -> str:
