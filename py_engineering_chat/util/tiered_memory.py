@@ -27,19 +27,32 @@ class TieredMemory:
 
     def _manage_tiers(self):
         """Manage the movement of memories between tiers."""
+        self.logger.debug("Starting _manage_tiers method")
         current_time = time.time()
         for tier, config in self.tiers.items():
+            self.logger.debug(f"Processing tier: {tier}")
             if tier == "long_term":
+                self.logger.debug("Skipping long_term tier")
                 continue  # Long-term memories are not automatically moved or deleted
 
             memories = self.chroma_db.get_conversations_by_metadata({"tier": tier})
+            self.logger.debug(f"Retrieved {len(memories)} memories for tier {tier}")
+
+            if memories is None:
+                self.logger.error(f"No memories found for tier {tier}")
+                continue
+
             for memory in memories:
                 age = current_time - memory['metadata']['timestamp']
+                self.logger.debug(f"Memory age: {age}, max_age: {config['max_age']}")
                 if age > config['max_age']:
+                    self.logger.debug(f"Moving memory {memory['id']} to next tier")
                     self._move_to_next_tier(memory, tier)
 
             # Prune excess memories if the tier is over capacity
             self._prune_tier(tier)
+
+        self.logger.debug("Finished _manage_tiers method")
 
     def _move_to_next_tier(self, memory: Dict[str, Any], current_tier: str):
         """Move a memory to the next tier."""
@@ -54,15 +67,19 @@ class TieredMemory:
 
     def _prune_tier(self, tier: str):
         """Remove excess memories from a tier."""
+        self.logger.debug(f"Starting _prune_tier for {tier}")
         memories = self.chroma_db.get_conversations_by_metadata({"tier": tier})
+        self.logger.debug(f"Retrieved {len(memories)} memories for pruning in tier {tier}")
         if len(memories) > self.tiers[tier]['max_items']:
             memories_to_remove = sorted(memories, key=lambda x: x['metadata']['timestamp'])[:-self.tiers[tier]['max_items']]
             for memory in memories_to_remove:
                 self.chroma_db.delete_conversation(memory['id'])
                 self.logger.info(f"Pruned memory {memory['id']} from {tier} tier")
+        self.logger.debug(f"Finished _prune_tier for {tier}")
 
     def _filter_results(self, results: List[Dict[str, Any]], n_results: int) -> List[Dict[str, Any]]:
         """Filter and rank results based on relevance and recency."""
+        self.logger.debug(f"Filtering {len(results)} results to {n_results}")
         # Implement a scoring system that considers both similarity and recency
         scored_results = []
         for result in results:
@@ -73,4 +90,6 @@ class TieredMemory:
             scored_results.append((combined_score, result))
 
         # Sort by combined score and return top n_results
-        return [result for _, result in sorted(scored_results, key=lambda x: x[0], reverse=True)[:n_results]]
+        filtered_results = [result for _, result in sorted(scored_results, key=lambda x: x[0], reverse=True)[:n_results]]
+        self.logger.debug(f"Returned {len(filtered_results)} filtered results")
+        return filtered_results
