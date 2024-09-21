@@ -37,3 +37,5 @@ class FileReadTool(BaseProjectTool):
     async def _arun(self, path: str) -> str:
         """Asynchronous version of the file read tool."""
         return self._run(path)
+
+#test
