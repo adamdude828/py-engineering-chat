@@ -1,8 +1,8 @@
-# file_write_tool.py
 import os
 from langchain.pydantic_v1 import BaseModel, Field
 from py_engineering_chat.util.logger_util import get_configured_logger
 from py_engineering_chat.tools.base_tool import BaseProjectTool
+from py_engineering_chat.tools.linting_router import LintingRouter
 
 class FileWriteInput(BaseModel):
     path: str = Field(description="The path to the file to modify, relative to the project shadow directory.")
@@ -13,11 +13,13 @@ class FileWriteTool(BaseProjectTool):
     description = "Write content to a file within the project shadow directory"
     args_schema: type[BaseModel] = FileWriteInput
 
+    def __init__(self):
+        super().__init__()
+        self.linting_router = LintingRouter()
+        self.logger = get_configured_logger(__name__)
+
     def _run(self, path: str, content: str) -> str:
-        """Write new content to a file with confirmation."""
-        logger = get_configured_logger(__name__)
-        logger.debug(f"Modifying file: {path}")
-        logger.debug(f"Content: {content}")
+        self.logger.debug(f"Attempting to modify file: {path}")
         shadow_directory = self.get_project_shadow_directory()
         full_path = os.path.abspath(os.path.join(shadow_directory, path))
 
@@ -25,29 +27,26 @@ class FileWriteTool(BaseProjectTool):
             return "Error: Access denied. Path is outside the project shadow directory."
 
         try:
-            # Read the current content of the file
-            with open(full_path, 'r') as file:
-                current_content = file.read()
-
-            # Truncate content for display
-            display_current_content = (current_content[:200] + '...') if len(current_content) > 200 else current_content
-            display_new_content = (content[:200] + '...') if len(content) > 200 else content
-
-            # Confirm with the user
-            print(f"Current content of {path}:\n{display_current_content}\n")
-            print(f"New content to be written:\n{display_new_content}\n")
-            confirmation = input(f"Do you want to replace the entire content of {path} with the new content? (yes/no): ")
+            # Simple confirmation with just the filename
+            confirmation = input(f"Do you want to modify the file '{path}'? (yes/no): ")
             if confirmation.lower() != 'yes':
                 return "Modification cancelled by user."
 
-            # Write the new content to the file
-            with open(full_path, 'w') as file:
-                file.write(content)
+            # Lint and fix the code using the router
+            linting_passed, fixed_content = self.linting_router.lint_and_fix(path, content)
 
-            return f"Successfully modified {full_path}."
+            if not linting_passed:
+                self.logger.warning("Linting failed after fix attempts. Write operation cancelled.")
+                return False
+
+            # Write the fixed content to the file
+            with open(full_path, 'w') as file:
+                file.write(fixed_content)
+
+            return f"Successfully modified and linted {full_path}."
         except Exception as e:
-            logger.error(f"Error modifying file: {e}")
-            return f"Error modifying file: {str(e)}"
+            self.logger.error(f"Error modifying file: {e}")
+            return False
 
     async def _arun(self, path: str, content: str) -> str:
         """Asynchronous version of the file write tool."""
