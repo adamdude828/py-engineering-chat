@@ -48,8 +48,6 @@ class GeneralAgent:
         4. If edit_mode is False, do not perform any write operations.
         5. For read operations, summarize the results briefly.
         6. For write operations (when edit_mode is True):
-           - Confirm the current Git branch.
-           - Ask for permission before making changes.
         7. Avoid displaying raw tool outputs or error messages.
 
         Current edit mode: {edit_mode}

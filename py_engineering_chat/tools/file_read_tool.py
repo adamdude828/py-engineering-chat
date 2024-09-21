@@ -15,6 +15,10 @@ class FileReadTool(BaseProjectTool):
     def _run(self, path: str) -> str:
         """Read content from a file."""
         logger = get_configured_logger(__name__)
+        
+        # Remove '@' prefix if present
+        path = path.lstrip('@')
+        
         logger.debug(f"Reading file: {path}")
         shadow_directory = self.get_project_shadow_directory()
         full_path = os.path.abspath(os.path.join(shadow_directory, path))

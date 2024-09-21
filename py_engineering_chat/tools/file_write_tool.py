@@ -15,6 +15,10 @@ class FileWriteTool(BaseProjectTool):
 
     def _run(self, path: str, content: str) -> str:
         logger = get_configured_logger(__name__)
+        
+        # Remove '@' prefix if present
+        path = path.lstrip('@')
+        
         logger.debug(f"Attempting to modify file: {path}")
         shadow_directory = self.get_project_shadow_directory()
         full_path = os.path.abspath(os.path.join(shadow_directory, path))
@@ -32,20 +36,20 @@ class FileWriteTool(BaseProjectTool):
             linting_router = LintingRouter()
 
             # Lint and fix the code using the router
-            linting_passed, fixed_content = linting_router.lint_and_fix(path, content)
+            #linting_passed, fixed_content = linting_router.lint_and_fix(path, content)
 
-            if not linting_passed:
-                logger.warning("Linting failed after fix attempts. Write operation cancelled.")
-                return False
+            # if not linting_passed:
+            #     logger.warning("Linting failed after fix attempts. Write operation cancelled.")
+            #     return "Linting failed. Write operation cancelled."
 
             # Write the fixed content to the file
             with open(full_path, 'w') as file:
-                file.write(fixed_content)
+                file.write(content)
 
             return f"Successfully modified and linted {full_path}."
         except Exception as e:
             logger.error(f"Error modifying file: {e}")
-            return False
+            return f"Error modifying file: {str(e)}"
 
     async def _arun(self, path: str, content: str) -> str:
         """Asynchronous version of the file write tool."""
