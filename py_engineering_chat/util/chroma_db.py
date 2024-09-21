@@ -40,6 +40,7 @@ class ChromaDB:
         result = self.collection.get(ids=[conversation_id])
         if result['ids']:
             return {
+                'id': result['ids'][0],
                 'content': result['documents'][0],
                 'metadata': result['metadatas'][0],
                 'embedding': result['embeddings'][0]
@@ -77,5 +78,23 @@ class ChromaDB:
                 results['documents'][0],
                 results['metadatas'][0],
                 results['distances'][0]
+            )
+        ]
+
+    def get_conversations_by_metadata(self, metadata_filter: Dict[str, Any]) -> List[Dict[str, Any]]:
+        self.logger.debug(f"Retrieving conversations with metadata filter: {metadata_filter}")
+        results = self.collection.get(where=metadata_filter)
+        return [
+            {
+                'id': id,
+                'content': document,
+                'metadata': metadata,
+                'embedding': embedding
+            }
+            for id, document, metadata, embedding in zip(
+                results['ids'],
+                results['documents'],
+                results['metadatas'],
+                results['embeddings']
             )
         ]
