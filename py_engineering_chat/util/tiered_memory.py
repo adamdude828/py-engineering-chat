@@ -22,6 +22,17 @@ class TieredMemory:
 
     def get_context(self, query_embedding: List[float], n_results: int = 5) -> List[Dict[str, Any]]:
         """Retrieve context from all tiers based on relevance."""
+        total_memories = sum(len(self.chroma_db.get_conversations_by_metadata({"tier": tier})) for tier in self.tiers)
+        if total_memories == 0:
+            self.logger.warning("No memories available. Returning empty context.")
+            return []
+        
+        if n_results > total_memories:
+            self.logger.warning(f"Requested {n_results} results, but only {total_memories} memories exist. Adjusting n_results.")
+            n_results = total_memories
+        
+        n_results = max(1, n_results)  # Ensure n_results is at least 1
+        
         results = self.chroma_db.search_conversations(query_embedding, n_results * 3)  # Get more results to filter
         return self._filter_results(results, n_results)
 
@@ -36,14 +47,14 @@ class TieredMemory:
                 continue  # Long-term memories are not automatically moved or deleted
 
             memories = self.chroma_db.get_conversations_by_metadata({"tier": tier})
-            self.logger.debug(f"Retrieved {len(memories) if memories else 0} memories for tier {tier}")
+            self.logger.debug(f"Retrieved {len(memories)} memories for tier {tier}")
 
             if not memories:
                 self.logger.debug(f"No memories found for tier {tier}")
                 continue
 
             for memory in memories:
-                age = current_time - memory['metadata']['timestamp']
+                age = current_time - memory['metadata'].get('timestamp', current_time)
                 self.logger.debug(f"Memory age: {age}, max_age: {config['max_age']}")
                 if age > config['max_age']:
                     self.logger.debug(f"Moving memory {memory['id']} to next tier")

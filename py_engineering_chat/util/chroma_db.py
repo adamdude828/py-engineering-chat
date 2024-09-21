@@ -62,6 +62,17 @@ class ChromaDB:
 
     def search_conversations(self, query_embedding: List[float], n_results: int = 5):
         self.logger.debug(f"Searching conversations with {n_results} results")
+        total_elements = self.collection.count()
+        if total_elements == 0:
+            self.logger.warning("No elements in the collection. Returning empty result.")
+            return []
+        
+        if n_results > total_elements:
+            self.logger.warning(f"Requested {n_results} results, but only {total_elements} elements exist. Adjusting n_results.")
+            n_results = total_elements
+        
+        n_results = max(1, n_results)  # Ensure n_results is at least 1
+        
         results = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=n_results
@@ -84,6 +95,11 @@ class ChromaDB:
     def get_conversations_by_metadata(self, metadata_filter: Dict[str, Any]) -> List[Dict[str, Any]]:
         self.logger.debug(f"Retrieving conversations with metadata filter: {metadata_filter}")
         results = self.collection.get(where=metadata_filter)
+        
+        if not results['ids']:
+            self.logger.debug("No conversations found matching the metadata filter")
+            return []
+        
         return [
             {
                 'id': id,

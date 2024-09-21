@@ -3,3 +3,4 @@ volumes/
 .chat_settings
 .shadow_directory
 .chroma_db
+.aider*
