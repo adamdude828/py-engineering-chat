@@ -17,6 +17,7 @@ class FileWriteTool(BaseProjectTool):
         """Write new content to a file with confirmation."""
         logger = get_configured_logger(__name__)
         logger.debug(f"Modifying file: {path}")
+        logger.debug(f"Content: {content}")
         shadow_directory = self.get_project_shadow_directory()
         full_path = os.path.abspath(os.path.join(shadow_directory, path))
 
