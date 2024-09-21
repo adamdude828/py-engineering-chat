@@ -16,6 +16,7 @@ from py_engineering_chat.tools.custom_tools import get_tools
 from py_engineering_chat.util.logger_util import get_configured_logger
 from py_engineering_chat.util.tiered_memory import TieredMemory
 from sentence_transformers import SentenceTransformer
+import time
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
