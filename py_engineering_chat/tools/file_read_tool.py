@@ -1,4 +1,3 @@
-# file_read_tool.py
 import os
 from langchain.pydantic_v1 import BaseModel, Field
 from py_engineering_chat.util.logger_util import get_configured_logger
@@ -37,5 +36,3 @@ class FileReadTool(BaseProjectTool):
     async def _arun(self, path: str) -> str:
         """Asynchronous version of the file read tool."""
         return self._run(path)
-
-#test
