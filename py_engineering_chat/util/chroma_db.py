@@ -37,10 +37,10 @@ class ChromaDB:
 
     def get_conversation(self, conversation_id: str):
         self.logger.debug(f"Retrieving conversation with ID: {conversation_id}")
-        result = self.collection.get(ids=[conversation_id], include=['embeddings', 'documents', 'metadatas', 'ids'])
-        if result and result['ids']:
+        result = self.collection.get(ids=[conversation_id], include=['embeddings', 'documents', 'metadatas'])
+        if result and result['documents']:
             return {
-                'id': result['ids'][0],
+                'id': conversation_id,
                 'content': result['documents'][0],
                 'metadata': result['metadatas'][0],
                 'embedding': result['embeddings'][0]
@@ -79,12 +79,12 @@ class ChromaDB:
         )
         return [
             {
-                'id': id,
+                'id': id_,
                 'content': document,
                 'metadata': metadata,
                 'distance': distance
             }
-            for id, document, metadata, distance in zip(
+            for id_, document, metadata, distance in zip(
                 results['ids'][0],
                 results['documents'][0],
                 results['metadatas'][0],
@@ -94,20 +94,20 @@ class ChromaDB:
 
     def get_conversations_by_metadata(self, metadata_filter: Dict[str, Any]) -> List[Dict[str, Any]]:
         self.logger.debug(f"Retrieving conversations with metadata filter: {metadata_filter}")
-        results = self.collection.get(where=metadata_filter, include=['embeddings', 'documents', 'metadatas', 'ids'])
+        results = self.collection.get(where=metadata_filter, include=['embeddings', 'documents', 'metadatas'])
         
-        if not results['ids']:
+        if not results['documents']:
             self.logger.debug("No conversations found matching the metadata filter")
             return []
         
         return [
             {
-                'id': id,
+                'id': id_,
                 'content': document,
                 'metadata': metadata,
                 'embedding': embedding
             }
-            for id, document, metadata, embedding in zip(
+            for id_, document, metadata, embedding in zip(
                 results['ids'],
                 results['documents'],
                 results['metadatas'],
