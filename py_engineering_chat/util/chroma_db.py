@@ -38,7 +38,7 @@ class ChromaDB:
     def get_conversation(self, conversation_id: str):
         self.logger.debug(f"Retrieving conversation with ID: {conversation_id}")
         result = self.collection.get(ids=[conversation_id])
-        if result['ids']:
+        if result and result['ids']:
             return {
                 'id': result['ids'][0],
                 'content': result['documents'][0],
