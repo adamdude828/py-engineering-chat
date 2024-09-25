@@ -8,6 +8,9 @@ class TestChromaDB:
     def setup_teardown(self):
         self.test_db_path = os.path.join(os.path.dirname(__file__), 'test_chroma_db')
         os.environ['AI_SHADOW_DIRECTORY'] = self.test_db_path
+        # Clear the test database before each test
+        if os.path.exists(self.test_db_path):
+            shutil.rmtree(self.test_db_path, ignore_errors=True)
         self.chroma_db = ChromaDB()
         yield
         shutil.rmtree(self.test_db_path, ignore_errors=True)
