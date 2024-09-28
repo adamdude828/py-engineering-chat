@@ -6,7 +6,6 @@ import json
 import os
 import time
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
-from prompt_toolkit import PromptSession
 from py_engineering_chat.util.file_completer import FileCompleter
 from py_engineering_chat.util.enter_key_bindings import kb
 from py_engineering_chat.util.command_parser import parse_commands
@@ -102,13 +101,11 @@ class PlanningAgent:
         return f"Plan saved to {file_path}"
 
     def run_conversation(self):
-        session = PromptSession(completer=FileCompleter(), key_bindings=kb)
-
         print("Welcome to the Planning Agent! Type 'exit' to end the conversation.")
 
         while True:
             try:
-                user_input = session.prompt("You: ")
+                user_input = input("You: ")
                 if user_input.lower() == 'exit':
                     print("Goodbye!")
                     break
