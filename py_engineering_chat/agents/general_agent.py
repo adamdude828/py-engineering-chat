@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
-from langchain_core.graphs import StateGraph
-from langchain_core.graphs.state_graph import START, END
+from langchain.graphs import StateGraph
+from langchain.graphs.state_graph import START, END
 from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage
