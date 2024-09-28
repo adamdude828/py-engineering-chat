@@ -6,8 +6,6 @@ import json
 import os
 import time
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
-from py_engineering_chat.util.file_completer import FileCompleter
-from py_engineering_chat.util.enter_key_bindings import kb
 from py_engineering_chat.util.command_parser import parse_commands
 
 class TaskPlan(BaseModel):
