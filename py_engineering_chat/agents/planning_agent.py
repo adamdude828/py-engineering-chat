@@ -1,16 +1,11 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
-from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage
 import json
 import os
 import time
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
-from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode, tools_condition
-from typing import Annotated
-from typing_extensions import TypedDict
-from langgraph.graph.message import add_messages
 from prompt_toolkit import PromptSession
 from py_engineering_chat.util.file_completer import FileCompleter
 from py_engineering_chat.util.enter_key_bindings import kb
@@ -24,10 +19,6 @@ class TaskPlan(BaseModel):
     resources: List[str] = Field(description="Resources needed for the task")
     potential_challenges: List[str] = Field(description="Potential challenges and mitigation strategies")
     additional_notes: str = Field(description="Any additional relevant information")
-
-class State(TypedDict):
-    messages: Annotated[list, add_messages]
-    context: str
 
 class PlanningAgent:
     def __init__(self):
@@ -45,7 +36,6 @@ class PlanningAgent:
             "What are the potential risks associated with this task?",
             "Is there any background information or context that's important to know?"
         ]
-        self.graph = self.create_graph()
 
     def ask_question(self, question):
         response = self.llm.invoke(self.conversation_history + [HumanMessage(content=question)])
@@ -111,25 +101,7 @@ class PlanningAgent:
             json.dump(plan.dict(), f, indent=2)
         return f"Plan saved to {file_path}"
 
-    def create_graph(self):
-        graph_builder = StateGraph(State)
-
-        def plan_step(state):
-            plan = self.generate_plan()
-            filename = f"task_plan_{int(time.time())}.json"
-            save_message = self.save_plan(plan, filename)
-            return {"messages": [AIMessage(content=f"Plan generated and saved. {save_message}")]}
-
-        graph_builder.add_node("plan", plan_step)
-        graph_builder.set_entry_point("plan")
-
-        graph_builder.add_edge("plan", END)
-
-        return graph_builder.compile()
-
     def run_conversation(self):
-        state = {"messages": [], "context": ""}
-        config = {"configurable": {"thread_id": "1"}}
         session = PromptSession(completer=FileCompleter(), key_bindings=kb)
 
         print("Welcome to the Planning Agent! Type 'exit' to end the conversation.")
@@ -143,29 +115,17 @@ class PlanningAgent:
 
                 context_data_list = parse_commands(user_input, ChatSettingsManager())
                 context_strings = [context_data.toString() for context_data in context_data_list]
-                state["context"] = " ".join(context_strings)
-                state["messages"].append(HumanMessage(content=user_input))
+                context = " ".join(context_strings)
 
-                for event in self.graph.stream(state, config):
-                    for value in event.values():
-                        if isinstance(value["messages"][-1], AIMessage):
-                            assistant_message = value["messages"][-1].content
-                            print(f"Assistant: {assistant_message}")
-                            state["messages"].append(AIMessage(content=assistant_message))
+                plan = self.generate_plan()
+                filename = f"task_plan_{int(time.time())}.json"
+                save_message = self.save_plan(plan, filename)
+                
+                print(f"Assistant: Plan generated and saved. {save_message}")
 
             except KeyboardInterrupt:
                 print("\nExiting...")
                 break
-
-async def plan_step(state):
-    planning_agent = PlanningAgent()
-    try:
-        plan = planning_agent.generate_plan()
-        filename = f"task_plan_{int(time.time())}.json"
-        save_message = planning_agent.save_plan(plan, filename)
-        return {"plan": plan.dict(), "save_message": save_message, "error": ""}
-    except Exception as e:
-        return {"plan": {}, "save_message": "", "error": str(e)}
 
 def run_conversation_planning_agent():
     agent = PlanningAgent()
