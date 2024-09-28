@@ -4,7 +4,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from typing import Annotated, Dict, Any
 from typing_extensions import TypedDict
 from langgraph.graph.message import add_messages
-from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from py_engineering_chat.util.command_parser import parse_commands
 from py_engineering_chat.util.chat_settings_manager import ChatSettingsManager
 from langchain_core.prompts import PromptTemplate
