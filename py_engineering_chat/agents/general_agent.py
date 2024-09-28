@@ -17,6 +17,8 @@ from py_engineering_chat.util.logger_util import get_configured_logger
 from py_engineering_chat.util.tiered_memory import TieredMemory
 from sentence_transformers import SentenceTransformer
 import time
+import asyncio
+from py_engineering_chat.util.MemoryRefiner import MemoryRefiner
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
@@ -30,7 +32,25 @@ class GeneralAgent:
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.logger = get_configured_logger(__name__)
         self.edit_mode = False  # Default to read-only mode
+        self.memory_refiner = MemoryRefiner(
+            self.tiered_memory,
+            ChatOpenAI(temperature=0, model_name="gpt-4"),
+            refinement_interval=300  # 5 minutes
+        )
+        self.loop = asyncio.get_event_loop()
+        self.refinement_task = None
         self.setup_graph()
+
+    async def start_background_refinement(self):
+        self.refinement_task = self.loop.create_task(self.memory_refiner.background_refinement_task())
+
+    async def stop_background_refinement(self):
+        if self.refinement_task:
+            self.refinement_task.cancel()
+            try:
+                await self.refinement_task
+            except asyncio.CancelledError:
+                self.logger.info("Background refinement task cancelled")
 
     def setup_graph(self):
         prompt = PromptTemplate.from_template("""
@@ -99,55 +119,59 @@ class GeneralAgent:
         mode = "enabled" if self.edit_mode else "disabled"
         print(f"Edit mode {mode}")
 
-    def run_conversation(self):
-        state = {"messages": [], "context": "", "edit_mode": self.edit_mode}
-        config = {"configurable": {"thread_id": "1"}}
-        session = PromptSession(completer=FileCompleter(), key_bindings=kb)
+    async def run_conversation(self):
+        await self.start_background_refinement()
+        try:
+            state = {"messages": [], "context": "", "edit_mode": self.edit_mode}
+            config = {"configurable": {"thread_id": "1"}}
+            session = PromptSession(completer=FileCompleter(), key_bindings=kb)
 
-        print("Welcome to the General Agent! Type 'exit' to end the conversation.")
-        print("Type '/toggle_edit' to switch between read-only and edit modes.")
+            print("Welcome to the General Agent! Type 'exit' to end the conversation.")
+            print("Type '/toggle_edit' to switch between read-only and edit modes.")
 
-        while True:
-            try:
-                user_input = session.prompt("You: ")
-                if user_input.lower() == 'exit':
-                    print("Goodbye!")
+            while True:
+                try:
+                    user_input = await self.loop.run_in_executor(None, session.prompt, "You: ")
+                    if user_input.lower() == 'exit':
+                        print("Goodbye!")
+                        break
+                    elif user_input.lower() == '/toggle_edit':
+                        self.toggle_edit_mode()
+                        state["edit_mode"] = self.edit_mode
+                        continue
+
+                    context_data_list = parse_commands(user_input, ChatSettingsManager())
+                    context_strings = [context_data.toString() for context_data in context_data_list]
+                    state["context"] = " ".join(context_strings)
+
+                    # Add user input to memory
+                    self.add_to_memory("user", user_input)
+
+                    # Get relevant context from memory
+                    memory_context = self.get_context(user_input)
+                    state["context"] += f"\nRelevant memory context:\n{memory_context}"
+
+                    state["messages"].append(HumanMessage(content=user_input))
+
+                    for event in self.graph.stream(state, config):
+                        for value in event.values():
+                            if isinstance(value["messages"][-1], AIMessage):
+                                assistant_message = value["messages"][-1].content
+                                print(f"Assistant: {assistant_message}")
+                                state["messages"].append(AIMessage(content=assistant_message))
+                                
+                                # Add assistant response to memory
+                                self.add_to_memory("assistant", assistant_message)
+
+                except KeyboardInterrupt:
+                    print("\nExiting...")
                     break
-                elif user_input.lower() == '/toggle_edit':
-                    self.toggle_edit_mode()
-                    state["edit_mode"] = self.edit_mode
-                    continue
+        finally:
+            await self.stop_background_refinement()
 
-                context_data_list = parse_commands(user_input, ChatSettingsManager())
-                context_strings = [context_data.toString() for context_data in context_data_list]
-                state["context"] = " ".join(context_strings)
-
-                # Add user input to memory
-                self.add_to_memory("user", user_input)
-
-                # Get relevant context from memory
-                memory_context = self.get_context(user_input)
-                state["context"] += f"\nRelevant memory context:\n{memory_context}"
-
-                state["messages"].append(HumanMessage(content=user_input))
-
-                for event in self.graph.stream(state, config):
-                    for value in event.values():
-                        if isinstance(value["messages"][-1], AIMessage):
-                            assistant_message = value["messages"][-1].content
-                            print(f"Assistant: {assistant_message}")
-                            state["messages"].append(AIMessage(content=assistant_message))
-                            
-                            # Add assistant response to memory
-                            self.add_to_memory("assistant", assistant_message)
-
-            except KeyboardInterrupt:
-                print("\nExiting...")
-                break
-
-def run_continuous_conversation():
+async def run_continuous_conversation():
     agent = GeneralAgent()
-    agent.run_conversation()
+    await agent.run_conversation()
 
 if __name__ == "__main__":
-    run_continuous_conversation()
+    asyncio.run(run_continuous_conversation())
