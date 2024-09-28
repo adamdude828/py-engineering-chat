@@ -36,14 +36,13 @@ class ChromaDB:
         )
 
     def get_conversation(self, conversation_id: str):
-        self.logger.debug(f"Retrieving conversation with ID: {conversation_id}")
-        result = self.collection.get(ids=[conversation_id], include=['embeddings', 'documents', 'metadatas'])
-        if result and result['documents']:
+        results = self.collection.get(ids=[conversation_id], include=['metadatas', 'documents', 'embeddings'])
+        if results['ids']:
             return {
-                'id': conversation_id,
-                'content': result['documents'][0],
-                'metadata': result['metadatas'][0],
-                'embedding': result['embeddings'][0]
+                'id': results['ids'][0],
+                'content': results['documents'][0],
+                'metadata': results['metadatas'][0],
+                'embedding': [round(float(val), 6) for val in results['embeddings'][0]]
             }
         return None
 

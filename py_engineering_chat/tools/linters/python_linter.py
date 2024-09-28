@@ -3,7 +3,7 @@ from io import StringIO
 import sys
 from py_engineering_chat.util.logger_util import get_configured_logger
 from py_engineering_chat.util.tiered_memory import TieredMemory
-from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from .base_linter import Linter
 
 class PythonLinter(Linter):

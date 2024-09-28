@@ -19,6 +19,8 @@ langchain_community = "^0.2.16"
 pygit2 = "^1.15.1"
 pylint = "^3.3.0"
 pytest = "^8.3.3"
+langgraph = "^0.2.28"
+prompt-toolkit = "^3.0.48"
 
 [tool.poetry.dev-dependencies]
 # Add any development dependencies here, if needed

@@ -1,4 +1,4 @@
-import openai 
+from langchain_community.chat_models import ChatOpenAI
 import json 
 from bs4 import BeautifulSoup
 from pydantic import BaseModel

@@ -6,7 +6,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 import chromadb
 from sentence_transformers import SentenceTransformer
 from typing import Dict, Any, List
-from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
